@@ -17,7 +17,7 @@ struct TemplateDecl
 
 struct ServiceDecl
 {
-    std::string name;  
+    std::string name;
 };
 
 struct Ast
