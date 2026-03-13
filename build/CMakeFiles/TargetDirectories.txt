@@ -1,0 +1,3 @@
+/home/riken/programming/abstack/build/CMakeFiles/abstack.dir
+/home/riken/programming/abstack/build/CMakeFiles/edit_cache.dir
+/home/riken/programming/abstack/build/CMakeFiles/rebuild_cache.dir
