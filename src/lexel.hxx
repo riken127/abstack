@@ -11,6 +11,7 @@ public:
 
     std::vector<Token> tokenize();
     static const char* to_string(TokenType type);
+
 private:
     std::string source;
     size_t pos = 0;
