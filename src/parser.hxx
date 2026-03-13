@@ -11,6 +11,7 @@ public:
     explicit Parser(const std::vector<Token>& tokens);
 
     Ast parse();
+    static void dump_ast(const Ast& ast);
 private:
     const std::vector<Token>& tokens;
     size_t current = 0;
@@ -22,7 +23,6 @@ private:
 
     bool check(TokenType type) const;
     bool match(TokenType type);
-
     const Token& consume(TokenType type, const char* message);
 
     TemplateDecl parse_template();

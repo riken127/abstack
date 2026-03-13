@@ -1,6 +1,7 @@
 #include <iostream>
 
 #include "lexel.hxx"
+#include "parser.hxx"
 
 int main(int argc, char** argv)
 {
@@ -9,10 +10,15 @@ int main(int argc, char** argv)
 cmd ["/app"]
 
 )";
+
     Lexer lexer{src};
 
-    for (const auto& t : lexer.tokenize())
-        std::cout << t.lexeme << " (" << lexer.to_string(t.type) << ")\n";
+    auto tokens = lexer.tokenize();
+
+    Parser parser{tokens};
+    auto ast = parser.parse();
+
+    parser.dump_ast(ast);
 
     return 0;
 }
