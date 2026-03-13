@@ -74,11 +74,6 @@ Ast Parser::parse()
              advance();
              ast.services.push_back(parse_service());
          }},
-        {TokenType::From,
-         [&]() {
-             advance();
-             auto image = consume(TokenType::String, "Expected image");
-         }},
     };
 
     while (!is_at_end())
@@ -140,14 +135,28 @@ Stage Parser::parse_stage()
     consume(TokenType::LBrace, "Expected `{` before stage body");
 
     while (!check(TokenType::RBrace))
-        advance();
+    {
+        if (match(TokenType::From))
+        {
+            stage.from_image = consume(TokenType::String, "Expected image from `from`").lexeme;
+        }
+        else if (match(TokenType::Run))
+        {
+            stage.run_commands.push_back(
+                consume(TokenType::String, "Expected command after `run`").lexeme);
+        }
+        else
+        {
+            throw std::runtime_error("Expected stage statement");
+        }
+    }
 
     consume(TokenType::RBrace, "Expected `}` after stage body");
 
     return stage;
 }
 
-void dump_ast(const Ast& ast)
+void Parser::dump_ast(const Ast& ast)
 {
     for (const auto& t : ast.templates)
     {
@@ -157,7 +166,15 @@ void dump_ast(const Ast& ast)
             std::cout << "  param: " << p << "\n";
 
         for (const auto& s : t.stages)
+        {
             std::cout << "  stage: " << s.name << "\n";
+
+            if (!s.from_image.empty())
+                std::cout << "    from: " << s.from_image << "\n";
+
+            for (const auto& cmd : s.run_commands)
+                std::cout << "    run: " << cmd << "\n";
+        }
     }
 
     for (const auto& s : ast.services)

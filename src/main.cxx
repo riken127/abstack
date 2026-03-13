@@ -7,7 +7,15 @@ int main(int argc, char** argv)
 {
     const std::string src = R"(
 
-cmd ["/app"]
+template go_service(name, port) {
+    stage build {
+        from "golang:1.22"
+        run "go build"
+        run "go test ./..."
+    }
+}
+
+service api {}
 
 )";
 
