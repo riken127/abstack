@@ -138,10 +138,16 @@ Stage Parser::parse_stage()
     {
         if (match(TokenType::From))
         {
+            if (!stage.from_image.empty())
+                throw std::runtime_error("Duplicate `from` in stage");
+
             stage.from_image = consume(TokenType::String, "Expected image from `from`").lexeme;
         }
         else if (match(TokenType::Workdir))
         {
+            if (!stage.workdir.empty())
+                throw std::runtime_error("Duplicate `workdir` in stage");
+
             stage.workdir = consume(TokenType::String, "Expected path after `workdir`").lexeme;
         }
         else if (match(TokenType::Run))
@@ -154,6 +160,9 @@ Stage Parser::parse_stage()
             throw std::runtime_error("Expected stage statement");
         }
     }
+
+    if (stage.from_image.empty())
+        throw std::runtime_error("Stage must contain `from`");
 
     consume(TokenType::RBrace, "Expected `}` after stage body");
 
