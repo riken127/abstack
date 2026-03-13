@@ -7,6 +7,7 @@ struct Stage
 {
     std::string name;
     std::string from_image;
+    std::string workdir;
     std::vector<std::string> run_commands;
 };
 

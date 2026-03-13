@@ -140,6 +140,10 @@ Stage Parser::parse_stage()
         {
             stage.from_image = consume(TokenType::String, "Expected image from `from`").lexeme;
         }
+        else if (match(TokenType::Workdir))
+        {
+            stage.workdir = consume(TokenType::String, "Expected path after `workdir`").lexeme;
+        }
         else if (match(TokenType::Run))
         {
             stage.run_commands.push_back(
@@ -171,6 +175,9 @@ void Parser::dump_ast(const Ast& ast)
 
             if (!s.from_image.empty())
                 std::cout << "    from: " << s.from_image << "\n";
+
+            if (!s.workdir.empty())
+                std::cout << "    workdir" << s.workdir << "\n";
 
             for (const auto& cmd : s.run_commands)
                 std::cout << "    run: " << cmd << "\n";

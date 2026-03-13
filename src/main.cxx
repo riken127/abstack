@@ -10,6 +10,7 @@ int main(int argc, char** argv)
 template go_service(name, port) {
     stage build {
         from "golang:1.22"
+        workdir "/src"
         run "go build"
         run "go test ./..."
     }
