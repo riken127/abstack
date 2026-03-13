@@ -11,8 +11,14 @@ template go_service(name, port) {
     stage build {
         from "golang:1.22"
         workdir "/src"
-        run "go build"
-        run "go test ./..."
+        copy "." "/src"
+        run "go build -o app ./cmd/api"
+    }
+
+    stage runtime {
+        from "alpine:3.19"
+        copy from build "/src/app" "/app"
+        run "chmod +x /app"
     }
 }
 

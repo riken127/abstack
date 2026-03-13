@@ -150,6 +150,20 @@ Stage Parser::parse_stage()
 
             stage.workdir = consume(TokenType::String, "Expected path after `workdir`").lexeme;
         }
+        else if (match(TokenType::Copy))
+        {
+            CopyStmt copy{};
+
+            if (match(TokenType::From))
+                copy.from_stage =
+                    consume(TokenType::Identifier, "Expected stage name after `from`").lexeme;
+
+            copy.source = consume(TokenType::String, "Expected source path in `copy`").lexeme;
+            copy.destination =
+                consume(TokenType::String, "Expected destination path in `copy`").lexeme;
+
+            stage.copies.push_back(copy);
+        }
         else if (match(TokenType::Run))
         {
             stage.run_commands.push_back(
@@ -161,10 +175,10 @@ Stage Parser::parse_stage()
         }
     }
 
+    consume(TokenType::RBrace, "Expected `}` after stage body");
+
     if (stage.from_image.empty())
         throw std::runtime_error("Stage must contain `from`");
-
-    consume(TokenType::RBrace, "Expected `}` after stage body");
 
     return stage;
 }
@@ -186,7 +200,16 @@ void Parser::dump_ast(const Ast& ast)
                 std::cout << "    from: " << s.from_image << "\n";
 
             if (!s.workdir.empty())
-                std::cout << "    workdir" << s.workdir << "\n";
+                std::cout << "    workdir: " << s.workdir << "\n";
+
+            for (const auto& copy : s.copies)
+            {
+                if (!copy.from_stage.empty())
+                    std::cout << "    copy from " << copy.from_stage << ": " << copy.source
+                              << " -> " << copy.destination << "\n";
+                else
+                    std::cout << "    copy: " << copy.source << " -> " << copy.destination << "\n";
+            }
 
             for (const auto& cmd : s.run_commands)
                 std::cout << "    run: " << cmd << "\n";

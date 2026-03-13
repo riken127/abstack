@@ -3,11 +3,19 @@
 #include <string>
 #include <vector>
 
+struct CopyStmt
+{
+    std::string from_stage;
+    std::string source;
+    std::string destination;
+};
+
 struct Stage
 {
     std::string name;
     std::string from_image;
     std::string workdir;
+    std::vector<CopyStmt> copies;
     std::vector<std::string> run_commands;
 };
 
