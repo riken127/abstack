@@ -8,4 +8,5 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 add_executable(abstack
     src/main.cxx
     src/lexer.cxx
+    src/parser.cxx
 )
