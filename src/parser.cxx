@@ -120,7 +120,44 @@ ServiceDecl Parser::parse_service()
 {
     ServiceDecl decl{};
     decl.name = consume(TokenType::Identifier, "Expected service name").lexeme;
+
     consume(TokenType::LBrace, "Expected `{` before service body");
+
+    while (!check(TokenType::RBrace))
+    {
+        if (match(TokenType::Use))
+        {
+            UseStmt use{};
+            use.template_name =
+                consume(TokenType::Identifier, "Expected template name after `use`").lexeme;
+
+            consume(TokenType::LParen, "Expected `(` after template name");
+
+            if (!check(TokenType::RParen))
+            {
+                do
+                {
+                    if (match(TokenType::String))
+                        use.arguments.push_back(previous().lexeme);
+                    else if (match(TokenType::Number))
+                        use.arguments.push_back(previous().lexeme);
+                    else if (match(TokenType::Identifier))
+                        use.arguments.push_back(previous().lexeme);
+                    else
+                        throw std::runtime_error("Expected argument");
+                } while (match(TokenType::Comma));
+            }
+
+            consume(TokenType::RParen, "Expected `)` after arguments");
+
+            decl.uses.push_back(use);
+        }
+        else
+        {
+            throw std::runtime_error("Expected service statement");
+        }
+    }
+
     consume(TokenType::RBrace, "Expected `}` after service body");
     return decl;
 }
@@ -219,5 +256,20 @@ void Parser::dump_ast(const Ast& ast)
     for (const auto& s : ast.services)
     {
         std::cout << "service " << s.name << "\n";
+
+        for (const auto& use : s.uses)
+        {
+            std::cout << "  use: " << use.template_name << "(";
+
+            for (size_t i = 0; i < use.arguments.size(); ++i)
+            {
+                std::cout << use.arguments[i];
+
+                if (i + 1 < use.arguments.size())
+                    std::cout << ", ";
+            }
+
+            std::cout << ")\n";
+        }
     }
 }

@@ -22,7 +22,9 @@ template go_service(name, port) {
     }
 }
 
-service api {}
+service api {
+    use go_service("api", 8080)
+}
 
 )";
 

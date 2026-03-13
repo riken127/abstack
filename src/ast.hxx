@@ -10,6 +10,12 @@ struct CopyStmt
     std::string destination;
 };
 
+struct UseStmt
+{
+    std::string template_name;
+    std::vector<std::string> arguments;
+};
+
 struct Stage
 {
     std::string name;
@@ -29,6 +35,7 @@ struct TemplateDecl
 struct ServiceDecl
 {
     std::string name;
+    std::vector<UseStmt> uses;
 };
 
 struct Ast
