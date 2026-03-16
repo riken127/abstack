@@ -7,6 +7,20 @@
 
 namespace
 {
+void validate_value(const Value& value,
+                    const std::unordered_set<std::string>& param_names,
+                    const std::string& template_name)
+{
+    if (const auto* ref = std::get_if<IdentifierRef>(&value))
+    {
+        if (!param_names.contains(ref->name))
+        {
+            throw std::runtime_error("Unknown parameter `" + ref->name + "` in template `" +
+                                     template_name + "`");
+        }
+    }
+}
+
 void validate_template(const TemplateDecl& tmpl)
 {
     if (tmpl.stages.empty())
@@ -30,9 +44,17 @@ void validate_template(const TemplateDecl& tmpl)
 
     for (const auto& stage : tmpl.stages)
     {
-        if (stage.from_image.empty())
+        if (!stage.from_image.has_value())
             throw std::runtime_error("Stage `" + stage.name + "` in template `" + tmpl.name +
                                      "` must contain `from`");
+
+        validate_value(*stage.from_image, param_names, tmpl.name);
+
+        if (stage.workdir.has_value())
+            validate_value(*stage.workdir, param_names, tmpl.name);
+
+        for (const auto& cmd : stage.run_commands)
+            validate_value(cmd, param_names, tmpl.name);
 
         for (const auto& copy : stage.copies)
         {
@@ -41,6 +63,9 @@ void validate_template(const TemplateDecl& tmpl)
                 throw std::runtime_error("Stage `" + stage.name + "` in template `" + tmpl.name +
                                          "` copies from unknown stage `" + copy.from_stage + "`");
             }
+
+            validate_value(copy.source, param_names, tmpl.name);
+            validate_value(copy.destination, param_names, tmpl.name);
         }
     }
 }
@@ -66,8 +91,8 @@ void validate_ast(const Ast& ast)
             throw std::runtime_error("Duplicate service `" + service.name + "`");
 
         if (service.uses.empty())
-            throw std::runtime_error("Service `" + service.name + "` must use at least one template");
-   
+            throw std::runtime_error("Service `" + service.name +
+                                     "` must use at least one template");
 
         for (const auto& use : service.uses)
         {
