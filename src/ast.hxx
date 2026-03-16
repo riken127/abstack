@@ -1,28 +1,42 @@
 #pragma once
 
+#include <optional>
 #include <string>
+#include <variant>
 #include <vector>
+
+struct StringLiteral
+{
+    std::string value;
+};
+
+struct IdentifierRef
+{
+    std::string name;   
+};
+
+using Value = std::variant<StringLiteral, IdentifierRef>;
 
 struct CopyStmt
 {
     std::string from_stage;
-    std::string source;
-    std::string destination;
+    Value source;
+    Value destination;
 };
 
 struct UseStmt
 {
     std::string template_name;
-    std::vector<std::string> arguments;
+    std::vector<Value> arguments;
 };
 
 struct Stage
 {
     std::string name;
-    std::string from_image;
-    std::string workdir;
+    std::optional<Value> from_image;
+    std::optional<Value> workdir;
     std::vector<CopyStmt> copies;
-    std::vector<std::string> run_commands;
+    std::vector<Value> run_commands;
 };
 
 struct TemplateDecl
