@@ -20,7 +20,6 @@ private:
     const Token& peek() const;
     const Token& previous() const;
     const Token& advance();
-
     bool check(TokenType type) const;
     bool match(TokenType type);
     const Token& consume(TokenType type, const char* message);
@@ -28,4 +27,5 @@ private:
     TemplateDecl parse_template();
     ServiceDecl parse_service();
     Stage parse_stage();
+    Value parse_value();
 };

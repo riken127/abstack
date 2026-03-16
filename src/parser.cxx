@@ -137,14 +137,7 @@ ServiceDecl Parser::parse_service()
             {
                 do
                 {
-                    if (match(TokenType::String))
-                        use.arguments.push_back(previous().lexeme);
-                    else if (match(TokenType::Number))
-                        use.arguments.push_back(previous().lexeme);
-                    else if (match(TokenType::Identifier))
-                        use.arguments.push_back(previous().lexeme);
-                    else
-                        throw std::runtime_error("Expected argument");
+                    use.arguments.push_back(parse_value());
                 } while (match(TokenType::Comma));
             }
 
@@ -175,17 +168,17 @@ Stage Parser::parse_stage()
     {
         if (match(TokenType::From))
         {
-            if (!stage.from_image.empty())
+            if (!stage.from_image.has_value())
                 throw std::runtime_error("Duplicate `from` in stage");
 
-            stage.from_image = consume(TokenType::String, "Expected image from `from`").lexeme;
+            stage.from_image = parse_value();
         }
         else if (match(TokenType::Workdir))
         {
-            if (!stage.workdir.empty())
+            if (!stage.workdir.has_value())
                 throw std::runtime_error("Duplicate `workdir` in stage");
 
-            stage.workdir = consume(TokenType::String, "Expected path after `workdir`").lexeme;
+            stage.workdir = parse_value();
         }
         else if (match(TokenType::Copy))
         {
@@ -195,16 +188,14 @@ Stage Parser::parse_stage()
                 copy.from_stage =
                     consume(TokenType::Identifier, "Expected stage name after `from`").lexeme;
 
-            copy.source = consume(TokenType::String, "Expected source path in `copy`").lexeme;
-            copy.destination =
-                consume(TokenType::String, "Expected destination path in `copy`").lexeme;
+            copy.source = parse_value();
+            copy.destination = parse_value();
 
             stage.copies.push_back(copy);
         }
         else if (match(TokenType::Run))
         {
-            stage.run_commands.push_back(
-                consume(TokenType::String, "Expected command after `run`").lexeme);
+            stage.run_commands.push_back(parse_value());
         }
         else
         {
@@ -213,12 +204,39 @@ Stage Parser::parse_stage()
     }
 
     consume(TokenType::RBrace, "Expected `}` after stage body");
-
-    if (stage.from_image.empty())
-        throw std::runtime_error("Stage must contain `from`");
-
     return stage;
 }
+
+Value Parser::parse_value()
+{
+    if (match(TokenType::String))
+        return StringLiteral{previous().lexeme};
+
+    if (match(TokenType::Identifier))
+        return IdentifierRef{previous().lexeme};
+
+    if (match(TokenType::Number))
+        return StringLiteral{previous().lexeme};
+
+    throw std::runtime_error("Expected value");
+}
+
+namespace
+{
+void dump_value(const Value& value)
+{
+    std::visit(
+        [](const auto& v) {
+            using T = std::decay_t<decltype(v)>;
+
+            if constexpr (std::is_same_v<T, StringLiteral>)
+                std::cout << '"' << v.value << '"';
+            else if constexpr (std::is_same_v<T, IdentifierRef>)
+                std::cout << v.name;
+        },
+        value);
+}
+} // namespace
 
 void Parser::dump_ast(const Ast& ast)
 {
@@ -233,23 +251,44 @@ void Parser::dump_ast(const Ast& ast)
         {
             std::cout << "  stage: " << s.name << "\n";
 
-            if (!s.from_image.empty())
-                std::cout << "    from: " << s.from_image << "\n";
+            if (s.from_image.has_value())
+                std::cout << "    from: ";
+            dump_value(*s.from_image);
+            std::cout << "\n";
 
-            if (!s.workdir.empty())
-                std::cout << "    workdir: " << s.workdir << "\n";
+            if (s.workdir.has_value())
+            {
+                std::cout << "    workdir: ";
+                dump_value(*s.workdir);
+                std::cout << "\n";
+            }
 
             for (const auto& copy : s.copies)
             {
                 if (!copy.from_stage.empty())
-                    std::cout << "    copy from " << copy.from_stage << ": " << copy.source
-                              << " -> " << copy.destination << "\n";
+                {
+                    std::cout << "    copy from " << copy.from_stage << ": ";
+                    dump_value(copy.source);
+                    std::cout << " -> ";
+                    dump_value(copy.destination);
+                    std::cout << "\n";
+                }
                 else
-                    std::cout << "    copy: " << copy.source << " -> " << copy.destination << "\n";
+                {
+                    std::cout << "    copy: ";
+                    dump_value(copy.source);
+                    std::cout << " -> ";
+                    dump_value(copy.destination);
+                    std::cout << "\n";
+                }
             }
 
             for (const auto& cmd : s.run_commands)
-                std::cout << "    run: " << cmd << "\n";
+            {
+                std::cout << "    run: ";
+                dump_value(cmd);
+                std::cout << "\n";
+            }
         }
     }
 
@@ -261,9 +300,9 @@ void Parser::dump_ast(const Ast& ast)
         {
             std::cout << "  use: " << use.template_name << "(";
 
-            for (size_t i = 0; i < use.arguments.size(); ++i)
+            for (std::size_t i = 0; i < use.arguments.size(); ++i)
             {
-                std::cout << use.arguments[i];
+                dump_value(use.arguments[i]);
 
                 if (i + 1 < use.arguments.size())
                     std::cout << ", ";
