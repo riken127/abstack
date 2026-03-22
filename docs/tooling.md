@@ -24,6 +24,14 @@ ctest --test-dir build/native --output-on-failure
 
 This preset writes the compile database to `build/native/`, which is what `.clangd` expects by default.
 
+Presets use the Ninja generator for cross-platform consistency (Linux/macOS/Windows).
+
+If you previously configured `build/native` with a different generator, run a fresh configure once:
+
+```bash
+cmake --preset native --fresh
+```
+
 ### Vcpkg
 
 The `vcpkg` preset is available for future dependency work. It expects `VCPKG_ROOT` to point to a local vcpkg checkout:
@@ -47,6 +55,23 @@ cmake --build --preset vcpkg
 
 The CLI can then expose `abstack tui` when curses support is found.
 
+## Windows
+
+Native Windows builds are supported and validated in CI.
+
+Typical PowerShell flow:
+
+```powershell
+cmake --preset native -DABSTACK_ENABLE_TUI=OFF
+cmake --build --preset native
+ctest --test-dir build/native --output-on-failure
+```
+
+Note:
+
+1. Docker-related commands require Docker Desktop/Engine and CLI access in the current shell.
+2. TUI support remains optional and depends on curses availability.
+
 ## LSP
 
 `clangd` is the recommended language server. It works well with the generated `compile_commands.json`, understands the project standard, and pairs naturally with `.clang-format` and `.clang-tidy`.
@@ -58,6 +83,20 @@ If you use VS Code, install the clangd extension and let it read the build tree 
 - Formatting: run `clang-format -i` on touched C++ sources.
 - Linting: run `clang-tidy` against the generated compile database when you want static analysis locally.
 - CI parity: configure, build, and run `ctest` from the native preset.
+
+## CLI Callback Logs
+
+CLI commands emit callback events to screen and persist them to:
+
+```text
+.abstack/logs/abstack-cli.log
+```
+
+Disable spinner output when needed:
+
+```bash
+ABSTACK_NO_SPINNER=1 abstack build samples/unified.abs --out-dir generated
+```
 
 ## Optional TUI Build Flag
 

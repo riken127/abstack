@@ -1,4 +1,4 @@
-# Standard Library Guide (v0.5.0)
+# Standard Library Guide (v0.6.0)
 
 This guide documents the bundled `abstack` stdlib profiles and templates.
 

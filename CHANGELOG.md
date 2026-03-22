@@ -2,6 +2,23 @@
 
 All notable changes to this project are documented in this file.
 
+## [0.6.0] - 2026-03-22
+
+### Added
+
+1. Native Windows CI job in GitHub Actions to validate configure/build/test on `windows-latest`.
+2. CLI callback event flow that prints tagged progress/events to screen.
+3. Persistent CLI callback log file: `.abstack/logs/abstack-cli.log`.
+4. Spinner feedback for wait-heavy non-interactive external command execution in CLI.
+5. `ABSTACK_NO_SPINNER=1` environment toggle to disable spinner output.
+
+### Changed
+
+1. CMake presets now use the Ninja generator for cross-platform parity.
+2. Docker helper and compose command execution paths use platform-aware quoting and normalized process exit handling.
+3. Project version bumped to 0.6.0.
+4. Tooling/CLI docs updated with Windows-native workflow and callback/spinner logging guidance.
+
 ## [0.5.0] - 2026-03-22
 
 ### Added

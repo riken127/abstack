@@ -9,7 +9,7 @@
     {
       "name": "base",
       "hidden": true,
-      "generator": "Unix Makefiles",
+      "generator": "Ninja",
       "binaryDir": "${sourceDir}/build/native",
       "cacheVariables": {
         "CMAKE_CXX_STANDARD": "20",

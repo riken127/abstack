@@ -8,15 +8,20 @@
 #include "abstack/stdlib/library.hxx"
 
 #include <algorithm>
+#include <array>
+#include <atomic>
 #include <chrono>
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
+#include <ctime>
 #include <filesystem>
 #include <fstream>
+#include <functional>
 #include <iomanip>
 #include <iostream>
 #include <iterator>
+#include <mutex>
 #include <optional>
 #include <regex>
 #include <sstream>
@@ -28,8 +33,11 @@
 #include <utility>
 #include <vector>
 
-#ifndef _WIN32
+#ifdef _WIN32
+#include <io.h>
+#else
 #include <sys/wait.h>
+#include <unistd.h>
 #endif
 
 #ifdef ABSTACK_HAS_CURSES
@@ -74,6 +82,198 @@ struct DockerContainerRow
     std::string ports;
 };
 
+enum class CallbackLevel
+{
+    Info,
+    Error
+};
+
+struct CallbackEvent
+{
+    std::string topic;
+    std::string message;
+    CallbackLevel level = CallbackLevel::Info;
+};
+
+using Callback = std::function<void(const CallbackEvent&)>;
+
+[[nodiscard]] std::string now_timestamp()
+{
+    const std::time_t now = std::time(nullptr);
+    std::tm tm_parts{};
+#ifdef _WIN32
+    localtime_s(&tm_parts, &now);
+#else
+    localtime_r(&now, &tm_parts);
+#endif
+
+    std::ostringstream out;
+    out << std::put_time(&tm_parts, "%Y-%m-%d %H:%M:%S");
+    return out.str();
+}
+
+[[nodiscard]] std::filesystem::path default_log_path()
+{
+    return ".abstack/logs/abstack-cli.log";
+}
+
+class CallbackRegistry
+{
+public:
+    CallbackRegistry() : callback_(default_callback)
+    {
+    }
+
+    void emit(const std::string& topic, const std::string& message, const CallbackLevel level)
+    {
+        const CallbackEvent event{.topic = topic, .message = message, .level = level};
+
+        callback_(event);
+        try
+        {
+            append_log(event);
+        }
+        catch (const std::exception&)
+        {
+            // Logging failures should never break primary CLI operations.
+        }
+    }
+
+private:
+    static void default_callback(const CallbackEvent& event)
+    {
+        std::ostream& stream = (event.level == CallbackLevel::Error) ? std::cerr : std::cout;
+        stream << "[" << event.topic << "] " << event.message << "\n";
+    }
+
+    void append_log(const CallbackEvent& event)
+    {
+        std::lock_guard<std::mutex> lock(log_mutex_);
+
+        if (!log_stream_.is_open())
+        {
+            const std::filesystem::path path = default_log_path();
+            std::filesystem::create_directories(path.parent_path());
+            log_stream_.open(path, std::ios::app);
+        }
+
+        if (!log_stream_.is_open())
+            return;
+
+        const std::string level = (event.level == CallbackLevel::Error) ? "ERROR" : "INFO";
+        log_stream_ << now_timestamp() << " [" << level << "] [" << event.topic
+                    << "] " << event.message << "\n";
+        log_stream_.flush();
+    }
+
+    Callback callback_;
+    std::ofstream log_stream_;
+    std::mutex log_mutex_;
+};
+
+[[nodiscard]] CallbackRegistry& callback_registry()
+{
+    static CallbackRegistry registry;
+    return registry;
+}
+
+void callback_info(const std::string& topic, const std::string& message)
+{
+    callback_registry().emit(topic, message, CallbackLevel::Info);
+}
+
+void callback_error(const std::string& topic, const std::string& message)
+{
+    callback_registry().emit(topic, message, CallbackLevel::Error);
+}
+
+[[nodiscard]] bool spinner_enabled()
+{
+    if (const char* no_spinner = std::getenv("ABSTACK_NO_SPINNER");
+        no_spinner != nullptr && std::string_view(no_spinner) == "1")
+    {
+        return false;
+    }
+
+#ifdef _WIN32
+    return _isatty(_fileno(stdout)) != 0;
+#else
+    return isatty(fileno(stdout)) != 0;
+#endif
+}
+
+class Spinner
+{
+public:
+    Spinner(std::string label, const bool enabled) : label_(std::move(label)), enabled_(enabled)
+    {
+        if (!enabled_)
+            return;
+
+        running_.store(true);
+        worker_ = std::thread([this]() {
+            static constexpr std::array<char, 4> kFrames{'|', '/', '-', '\\'};
+            std::size_t frame_index = 0;
+
+            while (running_.load())
+            {
+                std::cout << "\r" << label_ << " " << kFrames[frame_index % kFrames.size()]
+                          << std::flush;
+                ++frame_index;
+                std::this_thread::sleep_for(std::chrono::milliseconds(100));
+            }
+        });
+    }
+
+    Spinner(const Spinner&) = delete;
+    Spinner& operator=(const Spinner&) = delete;
+
+    ~Spinner()
+    {
+        finish(true, "");
+    }
+
+    void finish(const bool success, const std::string& detail)
+    {
+        if (!enabled_)
+            return;
+
+        bool expected = true;
+        if (!running_.compare_exchange_strong(expected, false))
+            return;
+
+        if (worker_.joinable())
+            worker_.join();
+
+        std::cout << "\r" << label_ << " " << (success ? "done" : "failed");
+        if (!detail.empty())
+            std::cout << " " << detail;
+        std::cout << "          \n";
+        std::cout.flush();
+    }
+
+private:
+    std::string label_;
+    bool enabled_ = false;
+    std::atomic<bool> running_{false};
+    std::thread worker_;
+};
+
+[[nodiscard]] int normalize_exit_code(const int status)
+{
+#ifdef _WIN32
+    return status;
+#else
+    if (status == -1)
+        return status;
+
+    if (WIFEXITED(status))
+        return WEXITSTATUS(status);
+
+    return status;
+#endif
+}
+
 [[nodiscard]] std::string read_file(const std::filesystem::path& path)
 {
     std::ifstream input(path, std::ios::binary);
@@ -113,8 +313,10 @@ void write_file(const std::filesystem::path& path, const std::string& content)
     return parsed;
 }
 
-[[nodiscard]] CommandOutput run_captured_command(const std::string& command)
+[[nodiscard]] CommandOutput run_captured_command(const std::string& command,
+                                                 const std::string& activity_label)
 {
+    callback_info("exec", "Running command: " + command);
     const std::string wrapped = command + " 2>&1";
 
 #ifdef _WIN32
@@ -126,6 +328,8 @@ void write_file(const std::filesystem::path& path, const std::string& content)
     if (pipe == nullptr)
         throw std::runtime_error("Failed to execute command: " + command);
 
+    Spinner spinner(activity_label, spinner_enabled());
+
     std::string output;
     char buffer[512]{};
     while (fgets(buffer, static_cast<int>(sizeof(buffer)), pipe) != nullptr)
@@ -133,13 +337,17 @@ void write_file(const std::filesystem::path& path, const std::string& content)
 
 #ifdef _WIN32
     const int status = _pclose(pipe);
-    const int exit_code = status;
 #else
     const int status = pclose(pipe);
-    int exit_code = status;
-    if (WIFEXITED(status))
-        exit_code = WEXITSTATUS(status);
 #endif
+
+    const int exit_code = normalize_exit_code(status);
+    spinner.finish(exit_code == 0, "(exit " + std::to_string(exit_code) + ")");
+
+    if (exit_code == 0)
+        callback_info("exec", "Command finished successfully");
+    else
+        callback_error("exec", "Command failed with exit code " + std::to_string(exit_code));
 
     return CommandOutput{.exit_code = exit_code, .output = std::move(output)};
 }
@@ -603,6 +811,20 @@ void print_stdlib_profiles()
 // quote each piece here so container names, users, and compose args stay safe.
 [[nodiscard]] std::string shell_escape(const std::string& input)
 {
+#ifdef _WIN32
+    std::string escaped = "\"";
+    for (const char c : input)
+    {
+        if (c == '"')
+            escaped += "\\\"";
+        else if (c == '%')
+            escaped += "%%";
+        else
+            escaped.push_back(c);
+    }
+    escaped += "\"";
+    return escaped;
+#else
     if (input.empty())
         return "''";
 
@@ -617,6 +839,26 @@ void print_stdlib_profiles()
     escaped += "'";
 
     return escaped;
+#endif
+}
+
+[[nodiscard]] int run_system_command(const std::string& command,
+                                     const std::string& activity_label,
+                                     const bool interactive)
+{
+    callback_info("exec", "Running command: " + command);
+    Spinner spinner(activity_label, spinner_enabled() && !interactive);
+
+    const int status = std::system(command.c_str());
+    const int exit_code = normalize_exit_code(status);
+
+    spinner.finish(exit_code == 0, "(exit " + std::to_string(exit_code) + ")");
+    if (exit_code == 0)
+        callback_info("exec", "Command finished successfully");
+    else
+        callback_error("exec", "Command failed with exit code " + std::to_string(exit_code));
+
+    return exit_code;
 }
 
 void print_help()
@@ -650,7 +892,11 @@ void print_help()
         << "  help  Show this help message.\n"
         << "\n"
         << "Compatibility:\n"
-        << "  abstack <file.abs> [options] is treated as build command.\n";
+        << "  abstack <file.abs> [options] is treated as build command.\n"
+        << "\n"
+        << "Observability:\n"
+        << "  callback events are logged to .abstack/logs/abstack-cli.log\n"
+        << "  set ABSTACK_NO_SPINNER=1 to disable spinner output.\n";
 }
 
 void print_docker_help()
@@ -701,12 +947,14 @@ int handle_docker_ls(const std::vector<std::string>& args)
 
     const auto filter_regex = compile_optional_regex(filter_pattern, "--filter");
 
-    const std::string command = "docker ps " + std::string(include_all ? "-a " : "") +
-                                "--no-trunc --format '{{.ID}}\\t{{.Names}}\\t{{.Image}}\\t{{.Status}}\\t{{.RunningFor}}\\t{{.Ports}}'";
+    const std::string format =
+        "{{.ID}}\\t{{.Names}}\\t{{.Image}}\\t{{.Status}}\\t{{.RunningFor}}\\t{{.Ports}}";
+    std::string command = "docker ps " + std::string(include_all ? "-a " : "") + "--no-trunc ";
+    command += "--format " + shell_escape(format);
 
     do
     {
-        const auto result = run_captured_command(command);
+        const auto result = run_captured_command(command, "Querying docker containers");
         if (result.exit_code != 0)
             throw std::runtime_error("docker ps failed:\n" + result.output);
 
@@ -758,7 +1006,8 @@ int handle_docker_inspect(const std::vector<std::string>& args)
         throw std::runtime_error("docker inspect requires exactly one container identifier");
 
     const auto result =
-        run_captured_command("docker inspect " + shell_escape(args.front()));
+        run_captured_command("docker inspect " + shell_escape(args.front()),
+                             "Inspecting container");
     if (result.exit_code != 0)
         throw std::runtime_error("docker inspect failed:\n" + result.output);
 
@@ -805,7 +1054,7 @@ int handle_docker_logs(const std::vector<std::string>& args)
         command += "--follow ";
 
     command += shell_escape(*container);
-    return std::system(command.c_str());
+    return run_system_command(command, "Streaming docker logs", follow);
 }
 
 int handle_docker_shell(const std::vector<std::string>& args)
@@ -847,7 +1096,7 @@ int handle_docker_shell(const std::vector<std::string>& args)
         command += "--user " + shell_escape(*user) + " ";
 
     command += shell_escape(*container) + " " + shell_escape(shell);
-    return std::system(command.c_str());
+    return run_system_command(command, "Opening container shell", true);
 }
 
 int handle_docker_stats(const std::vector<std::string>& args)
@@ -869,11 +1118,13 @@ int handle_docker_stats(const std::vector<std::string>& args)
     if (include_all)
         command += "--all";
 
-    return std::system(command.c_str());
+    return run_system_command(command, "Collecting docker stats", false);
 }
 
 int handle_docker(const std::vector<std::string>& args)
 {
+    callback_info("docker", "Starting docker helper command");
+
     if (args.empty() || args.front() == "help" || args.front() == "--help" || args.front() == "-h")
     {
         print_docker_help();
@@ -903,6 +1154,7 @@ int handle_docker(const std::vector<std::string>& args)
 
 int handle_build(const std::vector<std::string>& args)
 {
+    callback_info("build", "Starting build command");
     EmitOptions emit{};
     StdlibOptions stdlib{};
     std::optional<std::string> service_pattern;
@@ -958,6 +1210,7 @@ int handle_build(const std::vector<std::string>& args)
     if (stdlib.list_profiles)
     {
         print_stdlib_profiles();
+        callback_info("build", "Listed stdlib profiles");
         return 0;
     }
 
@@ -971,15 +1224,18 @@ int handle_build(const std::vector<std::string>& args)
     {
         std::cout << "Dry run successful: " << plan.services.size() << " service(s)\n";
         std::cout << abstack::emit_compose(plan);
+        callback_info("build", "Build dry-run completed");
         return 0;
     }
 
     [[maybe_unused]] const auto build_result = emit_plan(plan, emit, true);
+    callback_info("build", "Build command completed");
     return 0;
 }
 
 int handle_sync(const std::vector<std::string>& args)
 {
+    callback_info("sync", "Starting sync command");
     EmitOptions emit{};
     StdlibOptions stdlib{};
     std::optional<std::string> service_pattern;
@@ -1035,6 +1291,7 @@ int handle_sync(const std::vector<std::string>& args)
     if (stdlib.list_profiles)
     {
         print_stdlib_profiles();
+        callback_info("sync", "Listed stdlib profiles");
         return 0;
     }
 
@@ -1046,11 +1303,13 @@ int handle_sync(const std::vector<std::string>& args)
 
     const auto plan = plan_from_sync_dir(*input_dir, file_regex, stdlib.profile, service_regex, true);
     [[maybe_unused]] const auto build_result = emit_plan(plan, emit, true);
+    callback_info("sync", "Sync command completed");
     return 0;
 }
 
 int handle_fmt(const std::vector<std::string>& args)
 {
+    callback_info("fmt", "Starting format command");
     std::optional<std::filesystem::path> target;
     std::string file_pattern = R"(.*\.abs$)";
     bool check = false;
@@ -1160,6 +1419,7 @@ int handle_fmt(const std::vector<std::string>& args)
         std::cout << ": " << changed_count << " file(s) updated";
     std::cout << "\n";
 
+    callback_info("fmt", "Format command completed");
     return 0;
 }
 
@@ -1167,6 +1427,7 @@ int handle_fmt(const std::vector<std::string>& args)
 // inputs, then forward the remaining argv tail to `docker compose`.
 int handle_compose(const std::vector<std::string>& args)
 {
+    callback_info("compose", "Starting compose command");
     EmitOptions emit{};
     StdlibOptions stdlib{};
     std::optional<std::filesystem::path> abs_input;
@@ -1244,6 +1505,7 @@ int handle_compose(const std::vector<std::string>& args)
     if (stdlib.list_profiles)
     {
         print_stdlib_profiles();
+        callback_info("compose", "Listed stdlib profiles");
         return 0;
     }
 
@@ -1293,10 +1555,11 @@ int handle_compose(const std::vector<std::string>& args)
         command += " " + shell_escape(value);
 
     std::cout << "Running: " << command << "\n";
-    const int status = std::system(command.c_str());
+    const int status = run_system_command(command, "Running docker compose", true);
     if (status != 0)
         return status;
 
+    callback_info("compose", "Compose command completed");
     return 0;
 }
 
@@ -1461,6 +1724,7 @@ int main(int argc, char** argv)
                 subargs.front() == "-h")
             {
                 print_stdlib_profiles();
+                callback_info("stdlib", "Listed bundled stdlib profiles");
                 return 0;
             }
 
@@ -1475,7 +1739,7 @@ int main(int argc, char** argv)
     }
     catch (const std::exception& error)
     {
-        std::cerr << error.what() << "\n";
+        callback_error("fatal", error.what());
         return 1;
     }
 }

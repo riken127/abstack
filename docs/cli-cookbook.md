@@ -1,6 +1,12 @@
-# CLI Cookbook (v0.5.0)
+# CLI Cookbook (v0.6.0)
 
 This cookbook provides copy/paste command recipes for common `abstack` workflows.
+
+Callback and spinner notes:
+
+1. Commands emit callback tags to screen (for example `[build]`, `[compose]`).
+2. Callback history is written to `.abstack/logs/abstack-cli.log`.
+3. Disable spinner output with `ABSTACK_NO_SPINNER=1`.
 
 ## 1. First Compile Loop
 

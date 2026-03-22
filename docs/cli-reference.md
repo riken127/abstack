@@ -1,4 +1,4 @@
-# CLI Reference (v0.5.0)
+# CLI Reference (v0.6.0)
 
 This is a command-by-command reference for `abstack`.
 
@@ -24,6 +24,13 @@ Commands:
 6. `docker`
 7. `stdlib`
 8. `tui`
+
+Runtime callback/log behavior:
+
+1. CLI callback events are printed to screen as tagged lines (for example, `[build] ...`).
+2. Callback events are persisted to `.abstack/logs/abstack-cli.log`.
+3. Wait-heavy non-interactive external commands show a spinner by default.
+4. Set `ABSTACK_NO_SPINNER=1` to disable spinner output.
 
 Backward-compatible mode:
 
@@ -211,3 +218,4 @@ Requirements:
 3. `Compose file not found`: run `build`/`sync`, or pass explicit `--compose-file`.
 4. Docker daemon permission errors: ensure Docker socket/daemon access for current user.
 5. `Unknown stdlib profile`: run `abstack stdlib list`.
+6. Inspect callback traces: `.abstack/logs/abstack-cli.log`.

@@ -1,4 +1,4 @@
-# CLI Guide (v0.5.0)
+# CLI Guide (v0.6.0)
 
 This guide is the practical "how to operate `abstack`" document for local development, CI pipelines, and lightweight Docker runtime workflows.
 
@@ -22,6 +22,7 @@ Runtime dependencies by command family:
 1. `build`, `sync`, `fmt`: no Docker dependency.
 2. `compose`, `docker`: require Docker CLI and daemon access.
 3. `tui`: requires build with curses support (`ABSTACK_ENABLE_TUI=ON`).
+4. CLI callbacks log to `.abstack/logs/abstack-cli.log`.
 
 ## 2. Mental Model
 
@@ -49,8 +50,19 @@ When to use each command:
 4. Errors are surfaced as non-zero exit with explicit messages.
 5. Backward compatibility is preserved: `abstack <file.abs> ...` maps to `abstack build <file.abs> ...`.
 6. Stdlib linkage is explicit and opt-in through `--stdlib-profile`.
+7. Spinner feedback is shown for wait-heavy non-interactive shell calls (disable with `ABSTACK_NO_SPINNER=1`).
 
-## 4. Generated Output Model
+## 4. Windows Native Support
+
+`abstack` is built and tested natively on Windows in CI.
+
+Practical notes:
+
+1. Presets use Ninja for cross-platform consistency.
+2. Docker helper commands use Windows-safe shell quoting.
+3. Optional TUI may remain unavailable if curses support is not present.
+
+## 5. Generated Output Model
 
 Default generation behavior:
 
@@ -67,7 +79,7 @@ Cleanup behavior:
 1. `--clean` removes existing `Dockerfile.*` in `--out-dir`.
 2. `--clean` also removes the default compose output file in `--out-dir` when `--compose-file` is not explicitly set.
 
-## 5. `build`: Compile One `.abs` File
+## 6. `build`: Compile One `.abs` File
 
 Syntax:
 
@@ -106,7 +118,7 @@ abstack build samples/stdlib_stack.abs --stdlib-profile default --out-dir genera
 
 `--dry-run` writes no files and prints compose output to stdout after successful parse/validate/lower.
 
-## 6. `sync`: Regex-Driven Multi-File Compilation
+## 7. `sync`: Regex-Driven Multi-File Compilation
 
 Syntax:
 
@@ -143,7 +155,7 @@ abstack sync \
   --clean
 ```
 
-## 7. Stdlib Profiles (Opt-In)
+## 8. Stdlib Profiles (Opt-In)
 
 The bundled stdlib is linked before semantic validation/lowering only when explicitly requested.
 
@@ -166,7 +178,7 @@ Current bundled profile aliases:
 1. `core-v1`
 2. `default` (alias to `core-v1`)
 
-## 8. `fmt`: Canonical Formatting
+## 9. `fmt`: Canonical Formatting
 
 Syntax:
 
@@ -194,7 +206,7 @@ abstack fmt samples --file-regex '.*\\.abs$' --check
 abstack fmt samples/unified.abs --stdout
 ```
 
-## 9. `compose`: Generate + Run Compose
+## 10. `compose`: Generate + Run Compose
 
 Syntax:
 
@@ -225,7 +237,7 @@ abstack compose --compose-file generated/docker-compose.generated.yml -- ps
 abstack compose --input-dir samples --file-regex '.*\\.abs$' -- down
 ```
 
-## 10. `docker`: Minimal Runtime Helper
+## 11. `docker`: Minimal Runtime Helper
 
 Goal: provide lightweight container operations directly in `abstack` while staying close to native Docker behavior.
 
@@ -253,7 +265,7 @@ Scope boundaries:
 1. This is not a replacement for Docker Desktop or a full orchestration UI.
 2. It is intended for fast terminal-native inspection and debugging loops.
 
-## 11. `tui`: Optional Curses UI
+## 12. `tui`: Optional Curses UI
 
 Run:
 
@@ -273,7 +285,7 @@ Current key actions:
 3. `s`: sync one directory
 4. `q`: quit
 
-## 12. Regex Tips
+## 13. Regex Tips
 
 Common patterns:
 
@@ -288,7 +300,7 @@ Remember:
 2. Test patterns on small scopes first.
 3. `sync` file matching is evaluated against source paths relative to `--input-dir`.
 
-## 13. CI Patterns
+## 14. CI Patterns
 
 Minimal validation pipeline:
 
@@ -310,7 +322,7 @@ Compose smoke workflow (when Docker is available in CI):
 abstack compose --abs samples/unified.abs -- config
 ```
 
-## 14. Failure Modes and Diagnostics
+## 15. Failure Modes and Diagnostics
 
 1. Invalid regex: command reports which option/pattern failed.
 2. Missing required args: command reports missing option/value.
@@ -318,8 +330,9 @@ abstack compose --abs samples/unified.abs -- config
 4. Missing compose file: generate via `build`/`sync` or provide `--compose-file`.
 5. Docker access errors: confirm daemon availability and user permissions.
 6. Unknown stdlib profile: run `abstack stdlib list` or `--list-stdlib-profiles`.
+7. Shell command visibility and callback history: inspect `.abstack/logs/abstack-cli.log`.
 
-## 15. Quick Decision Guide
+## 16. Quick Decision Guide
 
 1. "I changed one file and want artifacts now": `build`.
 2. "I have many `.abs` files and want one merged output": `sync`.

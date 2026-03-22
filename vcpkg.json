@@ -1,6 +1,6 @@
 {
   "name": "abstack",
-  "version-string": "0.4.0",
+  "version-string": "0.6.0",
   "description": "A declarative language for reusable Docker builds and service instantiation.",
   "dependencies": [],
   "features": {

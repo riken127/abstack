@@ -22,3 +22,19 @@ jobs:
 
       - name: Test
         run: ctest --test-dir build/native --output-on-failure
+
+  windows:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure
+        run: cmake --preset native -DABSTACK_ENABLE_TUI=OFF
+
+      - name: Build
+        run: cmake --build --preset native
+
+      - name: Test
+        run: ctest --test-dir build/native --output-on-failure

@@ -9,7 +9,7 @@ A single `.abs` file compiles into:
 
 ## Current Version
 
-v0.5.0
+v0.6.0
 
 ## Why This Model
 
@@ -37,7 +37,9 @@ ctest --test-dir build/native --output-on-failure
 4. Multiple template instantiations per service (`use` can appear multiple times).
 5. Command/entrypoint scalar and array forms.
 6. Optional bundled stdlib profiles (`core-v1` / `default`) for reusable service templates.
-7. Utility-grade CLI commands: `build`, `sync`, `fmt`, `docker`, `compose`, `stdlib`, and optional `tui`.
+7. Native Windows build/test support in CI.
+8. CLI callbacks with persistent log registration (`.abstack/logs/abstack-cli.log`) and spinner feedback for wait-heavy shell commands.
+9. Utility-grade CLI commands: `build`, `sync`, `fmt`, `docker`, `compose`, `stdlib`, and optional `tui`.
 
 ## Documentation
 
@@ -50,11 +52,12 @@ ctest --test-dir build/native --output-on-failure
 7. [CLI cookbook](/home/riken/programming/abstack/docs/cli-cookbook.md)
 8. [Examples guide](/home/riken/programming/abstack/docs/examples.md)
 9. [Tooling/CI guide](/home/riken/programming/abstack/docs/tooling.md)
-10. [Release notes v0.5.0](/home/riken/programming/abstack/docs/releases/v0.5.0.md)
-11. [Release notes v0.4.0](/home/riken/programming/abstack/docs/releases/v0.4.0.md)
-12. [Release notes v0.3.0](/home/riken/programming/abstack/docs/releases/v0.3.0.md)
-13. [Changelog](/home/riken/programming/abstack/CHANGELOG.md)
-14. [Contributing](/home/riken/programming/abstack/CONTRIBUTING.md)
+10. [Release notes v0.6.0](/home/riken/programming/abstack/docs/releases/v0.6.0.md)
+11. [Release notes v0.5.0](/home/riken/programming/abstack/docs/releases/v0.5.0.md)
+12. [Release notes v0.4.0](/home/riken/programming/abstack/docs/releases/v0.4.0.md)
+13. [Release notes v0.3.0](/home/riken/programming/abstack/docs/releases/v0.3.0.md)
+14. [Changelog](/home/riken/programming/abstack/CHANGELOG.md)
+15. [Contributing](/home/riken/programming/abstack/CONTRIBUTING.md)
 
 ## Project Layout
 
