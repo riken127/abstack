@@ -15,6 +15,8 @@ enum class TokenType
     RBrace,
     LParen,
     RParen,
+    LBracket,
+    RBracket,
 
     Comma,
     Equal,

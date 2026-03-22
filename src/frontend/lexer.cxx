@@ -205,6 +205,10 @@ Token Lexer::symbol()
         return Token{TokenType::LParen, "(", line_};
     case ')':
         return Token{TokenType::RParen, ")", line_};
+    case '[':
+        return Token{TokenType::LBracket, "[", line_};
+    case ']':
+        return Token{TokenType::RBracket, "]", line_};
     case ',':
         return Token{TokenType::Comma, ",", line_};
     case '=':

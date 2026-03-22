@@ -1,9 +1,56 @@
 #include "abstack/codegen/dockerfile_emitter.hxx"
 
 #include <sstream>
+#include <type_traits>
 
 namespace abstack
 {
+
+namespace
+{
+[[nodiscard]] std::string json_quote(const std::string& value)
+{
+    std::string escaped;
+    escaped.reserve(value.size() + 2);
+    escaped.push_back('"');
+
+    for (const char c : value)
+    {
+        if (c == '"' || c == '\\')
+            escaped.push_back('\\');
+        escaped.push_back(c);
+    }
+
+    escaped.push_back('"');
+    return escaped;
+}
+
+[[nodiscard]] std::string format_command(const Command& command)
+{
+    return std::visit(
+        [](const auto& value) -> std::string {
+            using T = std::decay_t<decltype(value)>;
+            if constexpr (std::is_same_v<T, std::string>)
+            {
+                return value;
+            }
+            else
+            {
+                std::ostringstream output;
+                output << "[";
+                for (std::size_t i = 0; i < value.size(); ++i)
+                {
+                    output << json_quote(value[i]);
+                    if (i + 1 < value.size())
+                        output << ", ";
+                }
+                output << "]";
+                return output.str();
+            }
+        },
+        command);
+}
+} // namespace
 
 std::string emit_dockerfile(const ServiceBuild& service)
 {
@@ -39,10 +86,10 @@ std::string emit_dockerfile(const ServiceBuild& service)
             output << "EXPOSE " << port << "\n";
 
         if (stage.entrypoint.has_value())
-            output << "ENTRYPOINT " << *stage.entrypoint << "\n";
+            output << "ENTRYPOINT " << format_command(*stage.entrypoint) << "\n";
 
         if (stage.cmd.has_value())
-            output << "CMD " << *stage.cmd << "\n";
+            output << "CMD " << format_command(*stage.cmd) << "\n";
 
         if (i + 1 < service.stages.size())
             output << "\n";

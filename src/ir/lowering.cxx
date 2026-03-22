@@ -95,6 +95,51 @@ namespace
     return stringify_value(value);
 }
 
+[[nodiscard]] Command resolve_template_command(
+    const CommandExpr& command,
+    const std::unordered_map<std::string, Value>& bindings,
+    const std::string& template_name)
+{
+    return std::visit(
+        [&](const auto& expr) -> Command {
+            using T = std::decay_t<decltype(expr)>;
+            if constexpr (std::is_same_v<T, Value>)
+            {
+                return resolve_template_value(expr, bindings, template_name);
+            }
+            else
+            {
+                std::vector<std::string> values;
+                values.reserve(expr.items.size());
+                for (const auto& item : expr.items)
+                    values.push_back(resolve_template_value(item, bindings, template_name));
+                return values;
+            }
+        },
+        command);
+}
+
+[[nodiscard]] Command resolve_service_command(const CommandExpr& command)
+{
+    return std::visit(
+        [](const auto& expr) -> Command {
+            using T = std::decay_t<decltype(expr)>;
+            if constexpr (std::is_same_v<T, Value>)
+            {
+                return stringify_value(expr);
+            }
+            else
+            {
+                std::vector<std::string> values;
+                values.reserve(expr.items.size());
+                for (const auto& item : expr.items)
+                    values.push_back(stringify_value(item));
+                return values;
+            }
+        },
+        command);
+}
+
 [[nodiscard]] std::string normalize_port_mapping(const std::string& value)
 {
     if (value.find(':') != std::string::npos)
@@ -114,82 +159,112 @@ BuildPlan lower_to_ir(const Ast& ast)
 
     for (const auto& service : ast.services)
     {
-        const UseStmt& use = service.uses.front();
-        const auto tmpl_it = templates.find(use.template_name);
-        if (tmpl_it == templates.end())
+        if (service.uses.empty())
         {
-            throw std::runtime_error("Internal error: missing template `" + use.template_name +
-                                     "` during lowering");
+            throw std::runtime_error("Internal error: service `" + service.name +
+                                     "` has no template instantiations during lowering");
         }
-
-        const TemplateDecl& tmpl = *tmpl_it->second;
-
-        std::unordered_map<std::string, Value> bindings;
-        for (std::size_t i = 0; i < tmpl.params.size(); ++i)
-            bindings.emplace(tmpl.params[i], use.arguments[i]);
 
         ServiceBuild build{};
         build.service_name = service.name;
         build.compose.name = service.name;
         build.compose.dockerfile = "Dockerfile." + service.name;
 
-        build.stages.reserve(tmpl.stages.size());
-
-        for (const auto& stage : tmpl.stages)
+        for (std::size_t use_index = 0; use_index < service.uses.size(); ++use_index)
         {
-            DockerStage lowered_stage{};
-            lowered_stage.name = stage.name;
-            lowered_stage.from_image =
-                resolve_template_value(*stage.from_image, bindings, tmpl.name);
-
-            if (stage.workdir.has_value())
+            const UseStmt& use = service.uses[use_index];
+            const auto tmpl_it = templates.find(use.template_name);
+            if (tmpl_it == templates.end())
             {
-                lowered_stage.workdir =
-                    resolve_template_value(*stage.workdir, bindings, tmpl.name);
+                throw std::runtime_error("Internal error: missing template `" + use.template_name +
+                                         "` during lowering");
             }
 
-            lowered_stage.copies.reserve(stage.copies.size());
-            for (const auto& copy : stage.copies)
+            const TemplateDecl& tmpl = *tmpl_it->second;
+
+            std::unordered_map<std::string, Value> bindings;
+            for (std::size_t i = 0; i < tmpl.params.size(); ++i)
+                bindings.emplace(tmpl.params[i], use.arguments[i]);
+
+            std::unordered_map<std::string, std::string> stage_name_map;
+            for (const auto& stage : tmpl.stages)
             {
-                lowered_stage.copies.push_back(
-                    DockerCopy{.from_stage = copy.from_stage,
-                               .source = resolve_template_value(copy.source, bindings, tmpl.name),
-                               .destination =
-                                   resolve_template_value(copy.destination, bindings, tmpl.name)});
+                if (service.uses.size() == 1)
+                {
+                    stage_name_map.emplace(stage.name, stage.name);
+                }
+                else
+                {
+                    stage_name_map.emplace(stage.name,
+                                           "u" + std::to_string(use_index) + "_" + tmpl.name +
+                                               "_" + stage.name);
+                }
             }
 
-            lowered_stage.run_commands.reserve(stage.run_commands.size());
-            for (const auto& command : stage.run_commands)
+            for (const auto& stage : tmpl.stages)
             {
-                lowered_stage.run_commands.push_back(
-                    resolve_template_value(command, bindings, tmpl.name));
+                DockerStage lowered_stage{};
+                lowered_stage.name = stage_name_map.at(stage.name);
+                lowered_stage.from_image =
+                    resolve_template_value(*stage.from_image, bindings, tmpl.name);
+
+                if (stage.workdir.has_value())
+                {
+                    lowered_stage.workdir =
+                        resolve_template_value(*stage.workdir, bindings, tmpl.name);
+                }
+
+                lowered_stage.copies.reserve(stage.copies.size());
+                for (const auto& copy : stage.copies)
+                {
+                    std::optional<std::string> from_stage;
+                    if (copy.from_stage.has_value())
+                        from_stage = stage_name_map.at(*copy.from_stage);
+
+                    lowered_stage.copies.push_back(
+                        DockerCopy{.from_stage = from_stage,
+                                   .source = resolve_template_value(
+                                       copy.source, bindings, tmpl.name),
+                                   .destination = resolve_template_value(
+                                       copy.destination, bindings, tmpl.name)});
+                }
+
+                lowered_stage.run_commands.reserve(stage.run_commands.size());
+                for (const auto& command : stage.run_commands)
+                {
+                    lowered_stage.run_commands.push_back(
+                        resolve_template_value(command, bindings, tmpl.name));
+                }
+
+                lowered_stage.env.reserve(stage.env.size());
+                for (const auto& binding : stage.env)
+                {
+                    lowered_stage.env.emplace_back(
+                        binding.key,
+                        resolve_template_value(binding.value, bindings, tmpl.name));
+                }
+
+                lowered_stage.exposes.reserve(stage.exposes.size());
+                for (const auto& expose : stage.exposes)
+                {
+                    lowered_stage.exposes.push_back(
+                        resolve_template_value(expose, bindings, tmpl.name));
+                }
+
+                if (stage.cmd.has_value())
+                {
+                    lowered_stage.cmd = resolve_template_command(
+                        *stage.cmd, bindings, tmpl.name);
+                }
+
+                if (stage.entrypoint.has_value())
+                {
+                    lowered_stage.entrypoint = resolve_template_command(
+                        *stage.entrypoint, bindings, tmpl.name);
+                }
+
+                build.stages.push_back(std::move(lowered_stage));
             }
-
-            lowered_stage.env.reserve(stage.env.size());
-            for (const auto& binding : stage.env)
-            {
-                lowered_stage.env.emplace_back(
-                    binding.key,
-                    resolve_template_value(binding.value, bindings, tmpl.name));
-            }
-
-            lowered_stage.exposes.reserve(stage.exposes.size());
-            for (const auto& expose : stage.exposes)
-            {
-                lowered_stage.exposes.push_back(
-                    resolve_template_value(expose, bindings, tmpl.name));
-            }
-
-            if (stage.cmd.has_value())
-                lowered_stage.cmd = resolve_template_value(*stage.cmd, bindings, tmpl.name);
-
-            if (stage.entrypoint.has_value())
-            {
-                lowered_stage.entrypoint =
-                    resolve_template_value(*stage.entrypoint, bindings, tmpl.name);
-            }
-
-            build.stages.push_back(std::move(lowered_stage));
         }
 
         DockerStage& final_stage = build.stages.back();
@@ -206,14 +281,14 @@ BuildPlan lower_to_ir(const Ast& ast)
 
         if (service.cmd.has_value())
         {
-            const std::string cmd = stringify_value(*service.cmd);
+            Command cmd = resolve_service_command(*service.cmd);
             final_stage.cmd = cmd;
             build.compose.command = cmd;
         }
 
         if (service.entrypoint.has_value())
         {
-            const std::string entrypoint = stringify_value(*service.entrypoint);
+            Command entrypoint = resolve_service_command(*service.entrypoint);
             final_stage.entrypoint = entrypoint;
             build.compose.entrypoint = entrypoint;
         }

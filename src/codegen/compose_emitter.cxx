@@ -1,6 +1,7 @@
 #include "abstack/codegen/compose_emitter.hxx"
 
 #include <sstream>
+#include <type_traits>
 
 namespace abstack
 {
@@ -23,6 +24,25 @@ namespace
 
     escaped.push_back('"');
     return escaped;
+}
+
+void emit_command(std::ostringstream& output, const char* key, const Command& command)
+{
+    std::visit(
+        [&](const auto& value) {
+            using T = std::decay_t<decltype(value)>;
+            if constexpr (std::is_same_v<T, std::string>)
+            {
+                output << "    " << key << ": " << yaml_quote(value) << "\n";
+            }
+            else
+            {
+                output << "    " << key << ":\n";
+                for (const auto& item : value)
+                    output << "      - " << yaml_quote(item) << "\n";
+            }
+        },
+        command);
 }
 } // namespace
 
@@ -66,12 +86,10 @@ std::string emit_compose(const BuildPlan& plan)
         }
 
         if (service.compose.entrypoint.has_value())
-        {
-            output << "    entrypoint: " << yaml_quote(*service.compose.entrypoint) << "\n";
-        }
+            emit_command(output, "entrypoint", *service.compose.entrypoint);
 
         if (service.compose.command.has_value())
-            output << "    command: " << yaml_quote(*service.compose.command) << "\n";
+            emit_command(output, "command", *service.compose.command);
     }
 
     return output.str();

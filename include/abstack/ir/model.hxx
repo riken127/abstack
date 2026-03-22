@@ -3,10 +3,13 @@
 #include <optional>
 #include <string>
 #include <utility>
+#include <variant>
 #include <vector>
 
 namespace abstack
 {
+
+using Command = std::variant<std::string, std::vector<std::string>>;
 
 struct DockerCopy
 {
@@ -24,8 +27,8 @@ struct DockerStage
     std::vector<std::string> run_commands;
     std::vector<std::pair<std::string, std::string>> env;
     std::vector<std::string> exposes;
-    std::optional<std::string> cmd;
-    std::optional<std::string> entrypoint;
+    std::optional<Command> cmd;
+    std::optional<Command> entrypoint;
 };
 
 struct ComposeService
@@ -35,8 +38,8 @@ struct ComposeService
     std::vector<std::pair<std::string, std::string>> environment;
     std::vector<std::string> ports;
     std::vector<std::string> depends_on;
-    std::optional<std::string> command;
-    std::optional<std::string> entrypoint;
+    std::optional<Command> command;
+    std::optional<Command> entrypoint;
 };
 
 struct ServiceBuild

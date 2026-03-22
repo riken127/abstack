@@ -35,6 +35,7 @@ private:
 
     void parse_env_block(std::vector<EnvBinding>& env);
     [[nodiscard]] Value parse_value();
+    [[nodiscard]] CommandExpr parse_command_expr();
 
     [[noreturn]] void fail_here(const std::string& message) const;
 };

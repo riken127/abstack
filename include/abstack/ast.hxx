@@ -26,6 +26,13 @@ struct IdentifierValue
 
 using Value = std::variant<StringValue, NumberValue, IdentifierValue>;
 
+struct ArrayLiteral
+{
+    std::vector<Value> items;
+};
+
+using CommandExpr = std::variant<Value, ArrayLiteral>;
+
 struct EnvBinding
 {
     std::string key;
@@ -48,8 +55,8 @@ struct Stage
     std::vector<Value> run_commands;
     std::vector<EnvBinding> env;
     std::vector<Value> exposes;
-    std::optional<Value> cmd;
-    std::optional<Value> entrypoint;
+    std::optional<CommandExpr> cmd;
+    std::optional<CommandExpr> entrypoint;
 };
 
 struct UseStmt
@@ -71,8 +78,8 @@ struct ServiceDecl
     std::vector<UseStmt> uses;
     std::vector<EnvBinding> env;
     std::vector<Value> exposes;
-    std::optional<Value> cmd;
-    std::optional<Value> entrypoint;
+    std::optional<CommandExpr> cmd;
+    std::optional<CommandExpr> entrypoint;
     std::vector<Value> ports;
     std::vector<std::string> depends_on;
 };

@@ -2,6 +2,7 @@
 
 #include <stdexcept>
 #include <string>
+#include <type_traits>
 #include <unordered_map>
 #include <unordered_set>
 
@@ -66,10 +67,40 @@ void validate_template(const TemplateDecl& tmpl)
             validate_value_in_template(expose, param_names, tmpl.name);
 
         if (stage.cmd.has_value())
-            validate_value_in_template(*stage.cmd, param_names, tmpl.name);
+        {
+            std::visit(
+                [&](const auto& expr) {
+                    using T = std::decay_t<decltype(expr)>;
+                    if constexpr (std::is_same_v<T, Value>)
+                    {
+                        validate_value_in_template(expr, param_names, tmpl.name);
+                    }
+                    else
+                    {
+                        for (const auto& item : expr.items)
+                            validate_value_in_template(item, param_names, tmpl.name);
+                    }
+                },
+                *stage.cmd);
+        }
 
         if (stage.entrypoint.has_value())
-            validate_value_in_template(*stage.entrypoint, param_names, tmpl.name);
+        {
+            std::visit(
+                [&](const auto& expr) {
+                    using T = std::decay_t<decltype(expr)>;
+                    if constexpr (std::is_same_v<T, Value>)
+                    {
+                        validate_value_in_template(expr, param_names, tmpl.name);
+                    }
+                    else
+                    {
+                        for (const auto& item : expr.items)
+                            validate_value_in_template(item, param_names, tmpl.name);
+                    }
+                },
+                *stage.entrypoint);
+        }
 
         for (const auto& binding : stage.env)
             validate_value_in_template(binding.value, param_names, tmpl.name);
@@ -98,6 +129,24 @@ void validate_service_value(const Value& value, const std::string& service_name)
                                  "`; use string or number literals");
     }
 }
+
+void validate_service_command(const CommandExpr& value, const std::string& service_name)
+{
+    std::visit(
+        [&](const auto& expr) {
+            using T = std::decay_t<decltype(expr)>;
+            if constexpr (std::is_same_v<T, Value>)
+            {
+                validate_service_value(expr, service_name);
+            }
+            else
+            {
+                for (const auto& item : expr.items)
+                    validate_service_value(item, service_name);
+            }
+        },
+        value);
+}
 } // namespace
 
 void validate_ast(const Ast& ast)
@@ -121,12 +170,6 @@ void validate_ast(const Ast& ast)
 
         if (service.uses.empty())
             throw std::runtime_error("Service `" + service.name + "` must use one template");
-
-        if (service.uses.size() > 1)
-        {
-            throw std::runtime_error("Service `" + service.name +
-                                     "` currently supports exactly one `use` statement");
-        }
 
         for (const auto& use : service.uses)
         {
@@ -156,10 +199,10 @@ void validate_ast(const Ast& ast)
             validate_service_value(expose, service.name);
 
         if (service.cmd.has_value())
-            validate_service_value(*service.cmd, service.name);
+            validate_service_command(*service.cmd, service.name);
 
         if (service.entrypoint.has_value())
-            validate_service_value(*service.entrypoint, service.name);
+            validate_service_command(*service.entrypoint, service.name);
 
         for (const auto& port : service.ports)
             validate_service_value(port, service.name);
@@ -176,6 +219,18 @@ void validate_ast(const Ast& ast)
             {
                 throw std::runtime_error("Service `" + service.name +
                                          "` has duplicate dependency `" + dependency + "`");
+            }
+        }
+    }
+
+    for (const auto& service : ast.services)
+    {
+        for (const auto& dependency : service.depends_on)
+        {
+            if (!service_names.contains(dependency))
+            {
+                throw std::runtime_error("Service `" + service.name +
+                                         "` depends on unknown service `" + dependency + "`");
             }
         }
     }

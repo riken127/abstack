@@ -21,6 +21,10 @@ const char* to_string(const TokenType type)
         return "LParen";
     case TokenType::RParen:
         return "RParen";
+    case TokenType::LBracket:
+        return "LBracket";
+    case TokenType::RBracket:
+        return "RBracket";
     case TokenType::Comma:
         return "Comma";
     case TokenType::Equal:

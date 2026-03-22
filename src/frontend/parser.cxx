@@ -137,7 +137,7 @@ ServiceDecl Parser::parse_service()
             if (decl.cmd.has_value())
                 fail_here("duplicate `cmd` in service");
 
-            decl.cmd = parse_value();
+            decl.cmd = parse_command_expr();
             continue;
         }
 
@@ -146,7 +146,7 @@ ServiceDecl Parser::parse_service()
             if (decl.entrypoint.has_value())
                 fail_here("duplicate `entrypoint` in service");
 
-            decl.entrypoint = parse_value();
+            decl.entrypoint = parse_command_expr();
             continue;
         }
 
@@ -238,7 +238,7 @@ Stage Parser::parse_stage()
             if (stage.cmd.has_value())
                 fail_here("duplicate `cmd` in stage");
 
-            stage.cmd = parse_value();
+            stage.cmd = parse_command_expr();
             continue;
         }
 
@@ -247,7 +247,7 @@ Stage Parser::parse_stage()
             if (stage.entrypoint.has_value())
                 fail_here("duplicate `entrypoint` in stage");
 
-            stage.entrypoint = parse_value();
+            stage.entrypoint = parse_command_expr();
             continue;
         }
 
@@ -304,6 +304,25 @@ Value Parser::parse_value()
         return IdentifierValue{previous().lexeme};
 
     fail_here("expected value");
+}
+
+CommandExpr Parser::parse_command_expr()
+{
+    if (!match(TokenType::LBracket))
+        return parse_value();
+
+    ArrayLiteral literal{};
+
+    if (!check(TokenType::RBracket))
+    {
+        do
+        {
+            literal.items.push_back(parse_value());
+        } while (match(TokenType::Comma));
+    }
+
+    consume(TokenType::RBracket, "expected `]` after command array");
+    return literal;
 }
 
 void Parser::fail_here(const std::string& message) const

@@ -90,18 +90,75 @@ service api {
     assert_contains(compose, "LOG_LEVEL: \"info\"");
 }
 
-void test_semantic_rejects_multiple_use_statements()
+void test_multi_use_and_array_commands()
+{
+    const std::string source = R"(
+template app(name) {
+    stage build {
+        from "golang:1.22"
+        run "go build -o app ./cmd/${name}"
+    }
+
+    stage runtime {
+        from "alpine:3.20"
+        copy from build "/src/app" "/app"
+        expose 8080
+        cmd ["/app", "--serve"]
+    }
+}
+
+template diagnostics() {
+    stage tools {
+        from "alpine:3.20"
+        run "echo diagnostics"
+    }
+}
+
+service app {
+    use app("api")
+    use diagnostics()
+    entrypoint ["/bin/sh", "-c"]
+    cmd ["/app", "--prod"]
+    port "8080:8080"
+}
+)";
+
+    abstack::Lexer lexer(source);
+    const auto tokens = lexer.tokenize();
+    abstack::Parser parser(tokens);
+    const abstack::Ast ast = parser.parse();
+    abstack::validate_ast(ast);
+
+    const abstack::BuildPlan plan = abstack::lower_to_ir(ast);
+    assert(plan.services.size() == 1);
+
+    const std::string dockerfile = abstack::emit_dockerfile(plan.services.front());
+    assert_contains(dockerfile, "AS u0_app_build");
+    assert_contains(dockerfile, "AS u1_diagnostics_tools");
+    assert_contains(dockerfile, "ENTRYPOINT [\"/bin/sh\", \"-c\"]");
+    assert_contains(dockerfile, "CMD [\"/app\", \"--prod\"]");
+
+    const std::string compose = abstack::emit_compose(plan);
+    assert_contains(compose, "entrypoint:");
+    assert_contains(compose, "- \"/bin/sh\"");
+    assert_contains(compose, "- \"-c\"");
+    assert_contains(compose, "command:");
+    assert_contains(compose, "- \"/app\"");
+    assert_contains(compose, "- \"--prod\"");
+}
+
+void test_semantic_rejects_unknown_dependency()
 {
     const std::string source = R"(
 template base() {
     stage runtime {
-        from "alpine"
+        from "alpine:3.20"
     }
 }
 
 service app {
     use base()
-    use base()
+    depends_on missing
 }
 )";
 
@@ -128,6 +185,7 @@ service app {
 int main()
 {
     test_pipeline_generation();
-    test_semantic_rejects_multiple_use_statements();
+    test_multi_use_and_array_commands();
+    test_semantic_rejects_unknown_dependency();
     return 0;
 }
