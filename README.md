@@ -44,12 +44,14 @@ ctest --test-dir build/native --output-on-failure
 2. [Grammar reference](/home/riken/programming/abstack/docs/grammar.md)
 3. [Language guide](/home/riken/programming/abstack/docs/language-guide.md)
 4. [CLI guide](/home/riken/programming/abstack/docs/cli-guide.md)
-5. [Examples guide](/home/riken/programming/abstack/docs/examples.md)
-6. [Tooling/CI guide](/home/riken/programming/abstack/docs/tooling.md)
-7. [Release notes v0.4.0](/home/riken/programming/abstack/docs/releases/v0.4.0.md)
-8. [Release notes v0.3.0](/home/riken/programming/abstack/docs/releases/v0.3.0.md)
-9. [Changelog](/home/riken/programming/abstack/CHANGELOG.md)
-10. [Contributing](/home/riken/programming/abstack/CONTRIBUTING.md)
+5. [CLI reference](/home/riken/programming/abstack/docs/cli-reference.md)
+6. [CLI cookbook](/home/riken/programming/abstack/docs/cli-cookbook.md)
+7. [Examples guide](/home/riken/programming/abstack/docs/examples.md)
+8. [Tooling/CI guide](/home/riken/programming/abstack/docs/tooling.md)
+9. [Release notes v0.4.0](/home/riken/programming/abstack/docs/releases/v0.4.0.md)
+10. [Release notes v0.3.0](/home/riken/programming/abstack/docs/releases/v0.3.0.md)
+11. [Changelog](/home/riken/programming/abstack/CHANGELOG.md)
+12. [Contributing](/home/riken/programming/abstack/CONTRIBUTING.md)
 
 ## Project Layout
 

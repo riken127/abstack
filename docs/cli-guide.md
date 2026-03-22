@@ -1,47 +1,131 @@
 # CLI Guide (v0.4.0)
 
-`abstack` now provides a utility-style CLI with subcommands for generation, synchronization, formatting, and compose integration.
+This guide is the practical "how to operate `abstack`" document for local development, CI pipelines, and lightweight Docker runtime workflows.
 
-## 1. Command Overview
+## 1. Before You Start
 
-1. `build`: compile one `.abs` file.
-2. `sync`: compile many `.abs` files from a directory using regex matching.
-3. `fmt`: canonical formatter for `.abs` sources.
-4. `docker`: lightweight container helper (`ls`, `inspect`, `logs`, `shell`, `stats`).
-5. `compose`: optional wrapper around `docker compose` using generated compose output.
-6. `tui`: optional curses UI (if built with TUI support).
-
-Show help:
+Build the binary:
 
 ```bash
-abstack help
+cmake --preset native
+cmake --build --preset native
 ```
 
-## 2. Build
+The resulting executable is typically:
 
-Compile a single file:
+```text
+./build/native/abstack
+```
+
+Runtime dependencies by command family:
+
+1. `build`, `sync`, `fmt`: no Docker dependency.
+2. `compose`, `docker`: require Docker CLI and daemon access.
+3. `tui`: requires build with curses support (`ABSTACK_ENABLE_TUI=ON`).
+
+## 2. Mental Model
+
+`abstack` is compiler-first:
+
+1. Input is `.abs` source.
+2. Output is generated artifacts (`Dockerfile.<service>`, compose YAML).
+3. Runtime helpers (`compose`, `docker`) are optional wrappers, not orchestration replacements.
+
+When to use each command:
+
+1. `build`: one source file.
+2. `sync`: many source files from a directory tree with regex selection.
+3. `fmt`: canonical source formatting.
+4. `compose`: optionally generate, then run `docker compose`.
+5. `docker`: minimal container inspection/operations helper.
+6. `tui`: minimal interactive entrypoint for `build`/`fmt`/`sync`.
+
+## 3. Command Conventions
+
+1. Parsing is strict: unknown options fail immediately.
+2. Regex arguments use C++ regex syntax.
+3. Paths may be relative or absolute.
+4. Errors are surfaced as non-zero exit with explicit messages.
+5. Backward compatibility is preserved: `abstack <file.abs> ...` maps to `abstack build <file.abs> ...`.
+
+## 4. Generated Output Model
+
+Default generation behavior:
+
+1. Dockerfiles are emitted under `generated/` as `Dockerfile.<service>`.
+2. Compose is emitted as `generated/docker-compose.generated.yml`.
+
+Path controls:
+
+1. `--out-dir <dir>` changes Dockerfile output base and default compose location.
+2. `--compose-file <file>` sets explicit compose output path.
+
+Cleanup behavior:
+
+1. `--clean` removes existing `Dockerfile.*` in `--out-dir`.
+2. `--clean` also removes the default compose output file in `--out-dir` when `--compose-file` is not explicitly set.
+
+## 5. `build`: Compile One `.abs` File
+
+Syntax:
 
 ```bash
-abstack build samples/unified.abs --out-dir generated
+abstack build <file.abs> [options]
 ```
 
 Options:
 
 1. `--out-dir <dir>`
 2. `--compose-file <file>`
-3. `--service-regex <pattern>` to generate only matching services.
-4. `--clean` to remove old generated `Dockerfile.*` files before writing.
-5. `--dry-run` to validate/lower and print compose output without writing files.
+3. `--service-regex <pattern>`
+4. `--clean`
+5. `--dry-run`
 
-Compatibility mode also works:
+Typical usage:
 
 ```bash
-abstack samples/unified.abs --out-dir generated
+abstack build samples/unified.abs --out-dir generated --clean
 ```
 
-## 3. Sync (Regex-driven generation)
+Selective service generation:
 
-Compile all matching `.abs` files from a directory and merge into one output plan:
+```bash
+abstack build samples/unified.abs --service-regex '^(api|db)$'
+```
+
+Validation-only plus compose preview:
+
+```bash
+abstack build samples/unified.abs --dry-run
+```
+
+`--dry-run` writes no files and prints compose output to stdout after successful parse/validate/lower.
+
+## 6. `sync`: Regex-Driven Multi-File Compilation
+
+Syntax:
+
+```bash
+abstack sync --input-dir <dir> [options]
+```
+
+Options:
+
+1. `--input-dir <dir>` (required)
+2. `--file-regex <pattern>` (default `.*\\.abs$`)
+3. `--service-regex <pattern>`
+4. `--out-dir <dir>`
+5. `--compose-file <file>`
+6. `--clean`
+
+Processing behavior:
+
+1. Files are discovered recursively and sorted.
+2. Each source file is namespaced to avoid template/service name collisions.
+3. `depends_on` entries inside each file are remapped to the namespaced service IDs.
+4. Service filtering matches both namespaced and original base service names.
+
+Example:
 
 ```bash
 abstack sync \
@@ -52,133 +136,158 @@ abstack sync \
   --clean
 ```
 
-Why this is useful:
+## 7. `fmt`: Canonical Formatting
 
-1. Dynamic compose generation from many source files.
-2. Service slicing by regex (`--service-regex`) for environment-specific output.
-3. One-shot sync to keep generated artifacts aligned with sources.
-4. Automatic template/service namespacing per source file to avoid name collisions during merge.
+Syntax:
 
-## 4. Format
+```bash
+abstack fmt <file-or-dir> [options]
+```
 
-Format one file in place:
+Options:
+
+1. `--file-regex <pattern>` (directory mode only, default `.*\\.abs$`)
+2. `--check`
+3. `--stdout` (single-file mode only)
+
+Behavior:
+
+1. Formatting is semantic/canonical (AST-based), not token-preserving.
+2. Comments are currently not preserved.
+3. In `--check` mode, exit status is `1` if any file requires formatting.
+
+Examples:
 
 ```bash
 abstack fmt samples/unified.abs
-```
-
-Check formatting in CI style:
-
-```bash
 abstack fmt samples --file-regex '.*\\.abs$' --check
-```
-
-Print formatted output (single file):
-
-```bash
 abstack fmt samples/unified.abs --stdout
 ```
 
-Formatter behavior notes:
+## 8. `compose`: Generate + Run Compose
 
-1. Produces canonical ordering based on the AST model.
-2. Preserves valid syntax/values but not comments (comments are lexer-skipped currently).
+Syntax:
 
-## 5. Compose Integration
+```bash
+abstack compose [generation options] -- <docker compose args...>
+```
 
-This is intentionally a thin wrapper, not a full orchestration replacement.
+Generation choices:
 
-Generate from `.abs` then run compose:
+1. `--abs <file.abs>` for single-file generation.
+2. `--input-dir <dir>` plus sync options for multi-file generation.
+3. Omit both to run against an existing compose file.
+
+Important rules:
+
+1. `--` is required before compose arguments.
+2. `--abs` and `--input-dir` are mutually exclusive.
+3. If generation options are omitted, compose file must already exist.
+
+Examples:
 
 ```bash
 abstack compose --abs samples/unified.abs -- up -d
-```
-
-Use sync mode + compose:
-
-```bash
-abstack compose \
-  --input-dir samples \
-  --file-regex '.*\\.abs$' \
-  --service-regex '^api|db$' \
-  -- up -d
-```
-
-Use existing generated compose without regenerating:
-
-```bash
 abstack compose --compose-file generated/docker-compose.generated.yml -- ps
+abstack compose --input-dir samples --file-regex '.*\\.abs$' -- down
 ```
 
-## 6. Minimal Docker Ops Helper
+## 9. `docker`: Minimal Runtime Helper
 
-The `docker` command group gives a very small built-in operational view without trying to replace full Docker tooling.
+Goal: provide lightweight container operations directly in `abstack` while staying close to native Docker behavior.
 
-List running containers in a table:
+Subcommands:
 
-```bash
-abstack docker ls
-```
+1. `abstack docker ls [--all] [--filter <regex>] [--watch <seconds>]`
+2. `abstack docker inspect <container>`
+3. `abstack docker logs <container> [--tail <lines>] [--follow]`
+4. `abstack docker shell <container> [--shell <command>] [--user <user>]`
+5. `abstack docker stats [--all]`
 
-Include stopped containers and filter by regex:
+Examples:
 
 ```bash
 abstack docker ls --all --filter 'api|db'
-```
-
-Auto-refresh every 2 seconds (minimal htop-like behavior):
-
-```bash
 abstack docker ls --watch 2
+abstack docker inspect api-container
+abstack docker logs api-container --tail 300 --follow
+abstack docker shell api-container --shell bash --user root
+abstack docker stats --all
 ```
 
-Inspect container metadata:
+Scope boundaries:
 
-```bash
-abstack docker inspect my-container
-```
+1. This is not a replacement for Docker Desktop or a full orchestration UI.
+2. It is intended for fast terminal-native inspection and debugging loops.
 
-Tail logs:
+## 10. `tui`: Optional Curses UI
 
-```bash
-abstack docker logs my-container --tail 200
-abstack docker logs my-container --tail 200 --follow
-```
-
-Open a shell inside a container:
-
-```bash
-abstack docker shell my-container
-abstack docker shell my-container --shell bash --user root
-```
-
-One-shot stats table:
-
-```bash
-abstack docker stats
-```
-
-## 7. TUI (Optional)
-
-If built with curses support, launch:
+Run:
 
 ```bash
 abstack tui
 ```
 
-Current TUI actions:
+Availability:
 
-1. `b` build file
-2. `f` format file
-3. `s` sync directory
-4. `q` quit
+1. Present only when built with curses support.
+2. Otherwise exits with a clear enablement hint.
 
-## 8. Scope Clarification: “Full docker-compose integration”
+Current key actions:
 
-A full compose lifecycle framework inside abstack would likely be out of scope for the compiler core.
+1. `b`: build one file
+2. `f`: format one file
+3. `s`: sync one directory
+4. `q`: quit
 
-Current compromise (implemented):
+## 11. Regex Tips
 
-1. Abstack remains source-of-truth compiler.
-2. `compose` subcommand provides convenient pass-through execution.
-3. You still use native Docker Compose behavior directly, with generated files managed by abstack.
+Common patterns:
+
+1. All abs files: `.*\\.abs$`
+2. Only under a domain folder: `^services/payments/.*\\.abs$`
+3. Core service names: `^(api|worker|db)$`
+4. Match suffixed variants: `api(-.*)?$`
+
+Remember:
+
+1. Escape `\` for shell when needed.
+2. Test patterns on small scopes first.
+3. `sync` file matching is evaluated against source paths relative to `--input-dir`.
+
+## 12. CI Patterns
+
+Minimal validation pipeline:
+
+```bash
+abstack fmt samples --file-regex '.*\\.abs$' --check
+abstack build samples/unified.abs --out-dir generated --clean
+```
+
+Monorepo-style generation:
+
+```bash
+abstack sync --input-dir samples --file-regex '.*\\.abs$' --out-dir generated --clean
+```
+
+Compose smoke workflow (when Docker is available in CI):
+
+```bash
+abstack compose --abs samples/unified.abs -- config
+```
+
+## 13. Failure Modes and Diagnostics
+
+1. Invalid regex: command reports which option/pattern failed.
+2. Missing required args: command reports missing option/value.
+3. No service match: check `--service-regex` and namespacing assumptions.
+4. Missing compose file: generate via `build`/`sync` or provide `--compose-file`.
+5. Docker access errors: confirm daemon availability and user permissions.
+
+## 14. Quick Decision Guide
+
+1. "I changed one file and want artifacts now": `build`.
+2. "I have many `.abs` files and want one merged output": `sync`.
+3. "I need style consistency checks": `fmt --check`.
+4. "I want compose lifecycle from generated artifacts": `compose`.
+5. "I need fast container inspection/logs/shell": `docker`.
