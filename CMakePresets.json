@@ -1,0 +1,68 @@
+{
+  "version": 3,
+  "cmakeMinimumRequired": {
+    "major": 3,
+    "minor": 21,
+    "patch": 0
+  },
+  "configurePresets": [
+    {
+      "name": "base",
+      "hidden": true,
+      "generator": "Unix Makefiles",
+      "binaryDir": "${sourceDir}/build/native",
+      "cacheVariables": {
+        "CMAKE_CXX_STANDARD": "20",
+        "CMAKE_CXX_STANDARD_REQUIRED": "ON",
+        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON"
+      }
+    },
+    {
+      "name": "native",
+      "displayName": "Native build",
+      "description": "Configure the project with the default toolchain.",
+      "inherits": "base"
+    },
+    {
+      "name": "vcpkg",
+      "displayName": "Native build with vcpkg",
+      "description": "Configure the project with the vcpkg toolchain if VCPKG_ROOT is set.",
+      "inherits": "base",
+      "binaryDir": "${sourceDir}/build/vcpkg",
+      "toolchainFile": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake",
+      "environment": {
+        "VCPKG_FEATURE_FLAGS": "manifests"
+      }
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "native",
+      "displayName": "Native build",
+      "configurePreset": "native"
+    },
+    {
+      "name": "vcpkg",
+      "displayName": "Vcpkg build",
+      "configurePreset": "vcpkg"
+    }
+  ],
+  "testPresets": [
+    {
+      "name": "native",
+      "displayName": "Native test preset",
+      "configurePreset": "native",
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
+      "name": "vcpkg",
+      "displayName": "Vcpkg test preset",
+      "configurePreset": "vcpkg",
+      "output": {
+        "outputOnFailure": true
+      }
+    }
+  ]
+}

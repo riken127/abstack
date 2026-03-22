@@ -1,0 +1,7 @@
+CompileFlags:
+  Add: [-std=c++20, -Wall, -Wextra, -Wpedantic]
+  CompilationDatabase: build/native
+Diagnostics:
+  ClangTidy: true
+Index:
+  Background: Build

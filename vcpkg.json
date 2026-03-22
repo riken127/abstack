@@ -1,0 +1,6 @@
+{
+  "name": "abstack",
+  "version-string": "0.2.0",
+  "description": "A declarative language for reusable Docker builds and service instantiation.",
+  "dependencies": []
+}

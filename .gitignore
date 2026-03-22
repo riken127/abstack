@@ -1,1 +1,5 @@
-build
+build/
+.vscode/
+CMakeUserPresets.json
+generated/
+compile_commands.json
