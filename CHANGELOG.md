@@ -10,6 +10,7 @@ All notable changes to this project are documented in this file.
    - `build` for single-file compilation
    - `sync` for regex-driven multi-file composition generation
    - `fmt` for canonical `.abs` formatting and `--check` workflows
+   - `docker` for lightweight container ops (`ls`, `inspect`, `logs`, `shell`, `stats`)
    - `compose` as docker compose passthrough with optional pre-generation
 2. Automatic per-file namespacing during `sync` merges to avoid template/service collisions.
 3. Optional curses-backed TUI command (`abstack tui`) when built with TUI support.

@@ -7,8 +7,9 @@
 1. `build`: compile one `.abs` file.
 2. `sync`: compile many `.abs` files from a directory using regex matching.
 3. `fmt`: canonical formatter for `.abs` sources.
-4. `compose`: optional wrapper around `docker compose` using generated compose output.
-5. `tui`: optional curses UI (if built with TUI support).
+4. `docker`: lightweight container helper (`ls`, `inspect`, `logs`, `shell`, `stats`).
+5. `compose`: optional wrapper around `docker compose` using generated compose output.
+6. `tui`: optional curses UI (if built with TUI support).
 
 Show help:
 
@@ -109,7 +110,55 @@ Use existing generated compose without regenerating:
 abstack compose --compose-file generated/docker-compose.generated.yml -- ps
 ```
 
-## 6. TUI (Optional)
+## 6. Minimal Docker Ops Helper
+
+The `docker` command group gives a very small built-in operational view without trying to replace full Docker tooling.
+
+List running containers in a table:
+
+```bash
+abstack docker ls
+```
+
+Include stopped containers and filter by regex:
+
+```bash
+abstack docker ls --all --filter 'api|db'
+```
+
+Auto-refresh every 2 seconds (minimal htop-like behavior):
+
+```bash
+abstack docker ls --watch 2
+```
+
+Inspect container metadata:
+
+```bash
+abstack docker inspect my-container
+```
+
+Tail logs:
+
+```bash
+abstack docker logs my-container --tail 200
+abstack docker logs my-container --tail 200 --follow
+```
+
+Open a shell inside a container:
+
+```bash
+abstack docker shell my-container
+abstack docker shell my-container --shell bash --user root
+```
+
+One-shot stats table:
+
+```bash
+abstack docker stats
+```
+
+## 7. TUI (Optional)
 
 If built with curses support, launch:
 
@@ -124,7 +173,7 @@ Current TUI actions:
 3. `s` sync directory
 4. `q` quit
 
-## 7. Scope Clarification: “Full docker-compose integration”
+## 8. Scope Clarification: “Full docker-compose integration”
 
 A full compose lifecycle framework inside abstack would likely be out of scope for the compiler core.
 

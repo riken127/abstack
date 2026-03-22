@@ -36,7 +36,7 @@ ctest --test-dir build/native --output-on-failure
 3. Service runtime overlays (`env`, `expose`, `cmd`, `entrypoint`, `port`, `depends_on`).
 4. Multiple template instantiations per service (`use` can appear multiple times).
 5. Command/entrypoint scalar and array forms.
-6. Utility-grade CLI commands: `build`, `sync`, `fmt`, `compose`, and optional `tui`.
+6. Utility-grade CLI commands: `build`, `sync`, `fmt`, `docker`, `compose`, and optional `tui`.
 
 ## Documentation
 
