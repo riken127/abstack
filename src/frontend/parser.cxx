@@ -16,6 +16,8 @@ Ast Parser::parse()
 
     while (!is_at_end())
     {
+        // Top-level declarations are intentionally dispatched by leading keyword so the
+        // grammar stays easy to extend without a larger parser table.
         if (match(TokenType::Template))
         {
             ast.templates.push_back(parse_template());
@@ -114,6 +116,8 @@ ServiceDecl Parser::parse_service()
 
     while (!check(TokenType::RBrace))
     {
+        // Service bodies are a keyword-led statement list; each branch also enforces the
+        // per-statement uniqueness rules that the validator expects later.
         if (match(TokenType::Use))
         {
             decl.uses.push_back(parse_use());
@@ -182,6 +186,8 @@ Stage Parser::parse_stage()
 
     while (!check(TokenType::RBrace))
     {
+        // Stage bodies follow the same keyword-dispatch pattern, which keeps the statement
+        // ordering flexible while still guarding against duplicate singleton directives.
         if (match(TokenType::From))
         {
             if (stage.from_image.has_value())

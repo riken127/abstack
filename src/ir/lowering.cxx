@@ -187,6 +187,9 @@ BuildPlan lower_to_ir(const Ast& ast)
                 bindings.emplace(tmpl.params[i], use.arguments[i]);
 
             std::unordered_map<std::string, std::string> stage_name_map;
+            // Each template instantiation gets a private stage namespace when a service
+            // uses the template more than once; single-use templates keep their original
+            // names for readability in generated output.
             for (const auto& stage : tmpl.stages)
             {
                 if (service.uses.size() == 1)
@@ -267,6 +270,8 @@ BuildPlan lower_to_ir(const Ast& ast)
             }
         }
 
+        // Service-level fields intentionally overlay the last lowered stage, matching the
+        // DSL's "final stage then service overrides" model for compose-facing settings.
         DockerStage& final_stage = build.stages.back();
 
         for (const auto& binding : service.env)

@@ -27,6 +27,8 @@ void validate_value_in_template(const Value& value,
 
 void validate_template(const TemplateDecl& tmpl)
 {
+    // Template validation establishes the structural invariants that lowering assumes:
+    // unique params/stages, a concrete base image, and only in-template references.
     if (tmpl.stages.empty())
         throw std::runtime_error("Template `" + tmpl.name + "` must declare at least one stage");
 
@@ -151,6 +153,8 @@ void validate_service_command(const CommandExpr& value, const std::string& servi
 
 void validate_ast(const Ast& ast)
 {
+    // Resolve template arity first so uses are checked against a complete catalog, then
+    // do a second pass for dependency targets to allow forward references between services.
     std::unordered_map<std::string, std::size_t> template_arity;
 
     for (const auto& tmpl : ast.templates)

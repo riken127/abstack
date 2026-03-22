@@ -96,6 +96,8 @@ void Lexer::skip_whitespace_and_comments()
 
         if (c == '#')
         {
+            // Shell-style line comments are skipped without consuming the newline so the
+            // outer loop can keep line_ in sync in one place.
             while (!is_at_end() && peek() != '\n')
                 advance();
             continue;
@@ -124,6 +126,8 @@ void Lexer::skip_whitespace_and_comments()
                 while (!is_at_end())
                 {
                     const char current = advance();
+                    // Block comments can span lines, so track newlines here rather than
+                    // letting the generic whitespace path see them later.
                     if (current == '\n')
                         ++line_;
 

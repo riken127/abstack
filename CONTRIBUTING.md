@@ -19,6 +19,8 @@ If you want to experiment with vcpkg-backed dependencies later, use the `vcpkg` 
 - Editor indentation and line endings follow `.editorconfig`.
 - Static analysis is guided by `.clang-tidy`.
 - `clangd` is the recommended LSP because it understands the project compile database and the C++20 standard out of the box.
+- Prefer high-signal comments for non-obvious behavior (invariants, edge cases, generation semantics, security/shell boundaries).
+- Avoid line-by-line narration; if code is self-evident, skip the comment.
 
 ## Commits
 

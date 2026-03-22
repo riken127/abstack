@@ -366,6 +366,8 @@ void print_docker_table(const std::vector<DockerContainerRow>& rows)
     return output;
 }
 
+// Sync mode merges many .abs files into one plan, so each file gets a stable
+// per-path namespace to avoid template/service name collisions after merging.
 [[nodiscard]] abstack::Ast namespace_templates(abstack::Ast ast,
                                                const std::filesystem::path& input_dir,
                                                const std::filesystem::path& source_file)
@@ -536,6 +538,8 @@ void clean_generated_outputs(const EmitOptions& options)
     return plan_from_ast(merge_asts(std::move(asts)), service_regex);
 }
 
+// Shell-facing helpers build command strings one argument at a time, then
+// quote each piece here so container names, users, and compose args stay safe.
 [[nodiscard]] std::string shell_escape(const std::string& input)
 {
     if (input.empty())
@@ -596,6 +600,8 @@ void print_docker_help()
         << "  docker stats [--all]\n";
 }
 
+// Docker subcommands are intentionally thin wrappers: keep CLI parsing small,
+// then delegate to docker itself for the actual behavior.
 int handle_docker_ls(const std::vector<std::string>& args)
 {
     bool include_all = false;
@@ -1071,6 +1077,8 @@ int handle_fmt(const std::vector<std::string>& args)
     return 0;
 }
 
+// Compose is a two-stage command: first materialize the requested build/sync
+// inputs, then forward the remaining argv tail to `docker compose`.
 int handle_compose(const std::vector<std::string>& args)
 {
     EmitOptions emit{};
@@ -1087,6 +1095,7 @@ int handle_compose(const std::vector<std::string>& args)
 
         if (after_separator)
         {
+            // Everything after `--` is passed through unchanged to docker compose.
             compose_args.push_back(arg);
             continue;
         }
@@ -1174,6 +1183,8 @@ int handle_compose(const std::vector<std::string>& args)
                                  ". Generate it first with build/sync or pass --abs/--input-dir.");
     }
 
+    // Compose is assembled as a shell command only after each argument has
+    // been quoted, so the generated file path and passthrough args stay intact.
     std::string command = "docker compose -f " + shell_escape(compose_path.string());
     for (const auto& value : compose_args)
         command += " " + shell_escape(value);
@@ -1211,6 +1222,8 @@ int handle_compose(const std::vector<std::string>& args)
 int handle_tui()
 {
 #ifdef ABSTACK_HAS_CURSES
+    // The TUI is optional at build time; the command remains available, but the
+    // implementation is only compiled when curses support is present.
     initscr();
     cbreak();
     noecho();
@@ -1294,6 +1307,8 @@ int handle_tui()
     endwin();
     return 0;
 #else
+    // Keep the command wired up even in non-TUI builds so the user gets a clear
+    // runtime message instead of an accidental silent no-op.
     throw std::runtime_error(
         "This build does not include TUI support. Reconfigure with ABSTACK_ENABLE_TUI=ON and install curses.");
 #endif
