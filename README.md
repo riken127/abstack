@@ -9,7 +9,7 @@ A single `.abs` file compiles into:
 
 ## Current Version
 
-v0.3.0
+v0.4.0
 
 ## Why This Model
 
@@ -36,17 +36,20 @@ ctest --test-dir build/native --output-on-failure
 3. Service runtime overlays (`env`, `expose`, `cmd`, `entrypoint`, `port`, `depends_on`).
 4. Multiple template instantiations per service (`use` can appear multiple times).
 5. Command/entrypoint scalar and array forms.
+6. Utility-grade CLI commands: `build`, `sync`, `fmt`, `compose`, and optional `tui`.
 
 ## Documentation
 
 1. [Language spec](/home/riken/programming/abstack/docs/spec.md)
 2. [Grammar reference](/home/riken/programming/abstack/docs/grammar.md)
 3. [Language guide](/home/riken/programming/abstack/docs/language-guide.md)
-4. [Examples guide](/home/riken/programming/abstack/docs/examples.md)
-5. [Tooling/CI guide](/home/riken/programming/abstack/docs/tooling.md)
-6. [Release notes v0.3.0](/home/riken/programming/abstack/docs/releases/v0.3.0.md)
-7. [Changelog](/home/riken/programming/abstack/CHANGELOG.md)
-8. [Contributing](/home/riken/programming/abstack/CONTRIBUTING.md)
+4. [CLI guide](/home/riken/programming/abstack/docs/cli-guide.md)
+5. [Examples guide](/home/riken/programming/abstack/docs/examples.md)
+6. [Tooling/CI guide](/home/riken/programming/abstack/docs/tooling.md)
+7. [Release notes v0.4.0](/home/riken/programming/abstack/docs/releases/v0.4.0.md)
+8. [Release notes v0.3.0](/home/riken/programming/abstack/docs/releases/v0.3.0.md)
+9. [Changelog](/home/riken/programming/abstack/CHANGELOG.md)
+10. [Contributing](/home/riken/programming/abstack/CONTRIBUTING.md)
 
 ## Project Layout
 
@@ -55,6 +58,7 @@ ctest --test-dir build/native --output-on-failure
 - [`src/semantic`](/home/riken/programming/abstack/src/semantic): semantic checks
 - [`src/ir`](/home/riken/programming/abstack/src/ir): lowering and template expansion
 - [`src/codegen`](/home/riken/programming/abstack/src/codegen): Dockerfile/Compose emitters
+- [`src/format`](/home/riken/programming/abstack/src/format): canonical `.abs` formatter
 - [`src/cli/main.cxx`](/home/riken/programming/abstack/src/cli/main.cxx): CLI entrypoint
 - [`tests/pipeline_test.cxx`](/home/riken/programming/abstack/tests/pipeline_test.cxx): integration tests
 - [`samples`](/home/riken/programming/abstack/samples): runnable DSL samples

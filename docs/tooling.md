@@ -36,6 +36,17 @@ cmake --build --preset vcpkg
 
 That preset writes its build tree to `build/vcpkg/`. If you switch editors or want clangd to use that database instead, update the compile database path in `.clangd` or configure the project with the native preset again.
 
+For TUI-capable builds through vcpkg, enable the optional manifest feature:
+
+```bash
+export VCPKG_ROOT=/path/to/vcpkg
+export VCPKG_MANIFEST_FEATURES=tui
+cmake --preset vcpkg
+cmake --build --preset vcpkg
+```
+
+The CLI can then expose `abstack tui` when curses support is found.
+
 ## LSP
 
 `clangd` is the recommended language server. It works well with the generated `compile_commands.json`, understands the project standard, and pairs naturally with `.clang-format` and `.clang-tidy`.
@@ -47,3 +58,14 @@ If you use VS Code, install the clangd extension and let it read the build tree 
 - Formatting: run `clang-format -i` on touched C++ sources.
 - Linting: run `clang-tidy` against the generated compile database when you want static analysis locally.
 - CI parity: configure, build, and run `ctest` from the native preset.
+
+## Optional TUI Build Flag
+
+The CMake option `ABSTACK_ENABLE_TUI` controls whether curses-based TUI support is attempted.
+
+```bash
+cmake --preset native -DABSTACK_ENABLE_TUI=ON
+cmake --build --preset native
+```
+
+If curses is not detected, the binary still builds and the `tui` command reports that support is unavailable.

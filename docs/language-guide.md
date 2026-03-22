@@ -1,4 +1,4 @@
-# Abstack Language Guide (v0.3.0)
+# Abstack Language Guide (v0.4.0)
 
 This guide explains how to write `.abs` files, compile them, and reason about generated Dockerfile and Compose outputs.
 

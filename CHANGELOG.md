@@ -2,6 +2,33 @@
 
 All notable changes to this project are documented in this file.
 
+## [0.4.0] - 2026-03-22
+
+### Added
+
+1. Utility-style CLI command set:
+   - `build` for single-file compilation
+   - `sync` for regex-driven multi-file composition generation
+   - `fmt` for canonical `.abs` formatting and `--check` workflows
+   - `compose` as docker compose passthrough with optional pre-generation
+2. Automatic per-file namespacing during `sync` merges to avoid template/service collisions.
+3. Optional curses-backed TUI command (`abstack tui`) when built with TUI support.
+4. Core formatter module (`abstack::format_ast`) for AST-to-canonical-source rendering.
+5. New CLI documentation:
+   - `docs/cli-guide.md`
+6. Optional vcpkg manifest feature `tui` for curses dependency provisioning.
+
+### Changed
+
+1. Project version bumped to 0.4.0.
+2. Build system now detects and enables TUI support when curses is available.
+3. Pipeline tests now validate formatter output and reparse correctness.
+
+### Notes
+
+1. Compose integration is intentionally a thin wrapper around native `docker compose` behavior.
+2. Formatter currently normalizes structure based on AST semantics and does not preserve comments.
+
 ## [0.3.0] - 2026-03-22
 
 ### Added
