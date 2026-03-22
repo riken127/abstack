@@ -1,307 +1,141 @@
-# Abstack Language Specification v0.0.1
+# Abstack Language Specification v0.2.0
+
 ## 1. Goal
-`abstack` is a declarative language made to define reusable docker builds using templates and services.
-The compiler:
-```
-abstack file.abs -> Dockerfile(s)
-```
-Properties:
-1. Output is always a Dockerfile by default
-2. DSL focused on reuse and composability
-3. *Not a programming language*
-5. No loops, ifs or dynamic logic
-## 2. File Structure
-An `abstack` file contains:
-```
-template declarations
-service declarations
-```
-Example:
-```
-template go_service(name, port) {
-    ...
-}
+`abstack` is a declarative DSL for defining reusable container build logic and service runtime instantiation in one source of truth.
 
-service api {
-    use go_service("api", 8080)
-}
+Compilation model:
+
+```text
+abstack file.abs -> Dockerfile.<service>* + docker-compose.generated.yml
 ```
-## 3. Main Constructs
-The language has only two type of top-level declarations
-### Template
-Defines a reusable pattern of a Docker build.
-```
-template go_service(name, port) {
+
+In v0.2, `docker-compose` is treated as a projection of `service`, not as an independent authoring syntax.
+
+## 2. Design Principles
+1. Declarative only: no loops, conditionals, or mutable state.
+2. Clear separation: templates define image build behavior, services define deployment/runtime instantiation.
+3. Reuse-first: one template can be reused by different services with different arguments.
+4. Deterministic output: generation should be stable and diff-friendly.
+
+## 3. Source Model
+A file contains only:
+1. `template` declarations
+2. `service` declarations
+
+```abstack
+template app_image(name, service_port) {
     stage build {
         from "golang:1.22"
-        run "go build"
-    }
-}
-```
-### Service
-Defines a real container that will be compiler into a Dockerfile
-```
-service api {
-    use go_service("api", 8080)
-}
-```
-Each `service` generates:
-```
-Dockerfile.<service>
-```
-or
-```
-services/<service>/Dockerfile
-```
-TBD!
-## 4. Template parameters
-Templates accept parameters
-```
-template go_service(name, port)
-```
-Types supported in v0.0.1:
-```
-string
-integer
-identifier
-```
-Use inside a template:
-```
-run "go build./cmd/${name}
-expose port
-```
-Interpolation use:
-```
-${variable}
-```
-## 5. Supported statements
-Inside of `stage` or service.
-### stage
-Defines a docker stage.
-```
-stage build {
-    ...
-}
-```
-### from
-Defines the base image.
-```
-from "golang:1.22"
-```
-equivalent:
-```
-FROM golang:1.22
-```
-### run
-```
-run "go build"
-```
-```
-RUN go build
-```
-### copy
-```
-copy "." "/src"
-```
-```
-COPY - /src
-```
-With stage:
-```
-copy from build "/src/app" "/app"
-```
-```
-COPY --from=build /src/app /app
-```
-### env
-```
-env {
-    KEY = "value"
-    DEBUG = "true"
-}
-```
-```
-ENV KEY=value
-ENV DEBUG=true
-```
-### expose
-```
-expose 8080
-```
-```
-EXPOSE 8080
-```
-### cmd
-```
-cmd ["/app"]
-```
-```
-CMD ["/app"]
-```
-### entrypoint
-```
-entrypoint ["/app"]
-```
-```
-ENTRYPOINT ["/app"]
-```
-### use
-Instantiates a template.
-```
-use go_service("api", 8080)
-```
-```
-Expands a template within a service
-```
-## 6. Multi-stage builds
-Templates can define multiple stages.
-```
-template go_service(name, port) {
-    stage build {
-        from "golang:1.22"
-        run "go build"
-    }
-
-    stage runtime {
-        from "alpine"
-        copy from build "/src/app" "/app"
-    }
-}
-```
-```
-FROM golang:1.22 AS build
-RUN go build
-
-FROM alpine AS runtime
-COPY --from=build /src/app /app
-```
-## 7. Example of a complete file
-```
-template go_service(name, port) {
-
-    stage build {
-        from "golang:1.22-alpine"
-        workdir "/src"
-
-        copy "." "/src"
-
         run "go build -o app ./cmd/${name}"
     }
 
     stage runtime {
-        from "alpine:3.19"
-
+        from "alpine:3.20"
         copy from build "/src/app" "/app"
-
-        expose port
-
-        cmd ["/app"]
+        expose service_port
+        cmd "/app"
     }
 }
 
 service api {
-
-    use go_service("api", 8080)
-
+    use app_image("api", 8080)
     env {
-        SERVICE_NAME = "api"
         LOG_LEVEL = "info"
     }
-
+    port "8080:8080"
+    depends_on db
 }
 ```
-## 8. Generation rules
-Compilation:
+
+## 4. Core Distinction
+### Template
+`template` defines reusable build graph(s) through stage declarations.
+
+Responsibilities:
+1. Build stages (`stage`, `from`, `copy`, `run`, `workdir`)
+2. Image defaults (`env`, `expose`, `cmd`, `entrypoint`)
+3. Parameterized reuse
+
+### Service
+`service` instantiates a template and provides runtime/deployment overlays.
+
+Responsibilities:
+1. Instantiate build logic with `use`
+2. Add runtime env/port/dependency configuration
+3. Override runtime command/entrypoint when needed
+4. Project runtime config into compose output
+
+## 5. Values and Parameters
+Supported value forms:
+1. `string`
+2. `integer`
+3. `identifier` (primarily for template parameter references)
+
+String interpolation inside template strings is supported via `${param}`.
+
+Example:
+
+```abstack
+run "go build -o app ./cmd/${name}"
 ```
-service -> Dockerfile
-```
+
+## 6. Statements
+### Template / Stage Statements
+Inside `stage`:
+1. `from <value>`
+2. `workdir <value>`
+3. `copy <value> <value>`
+4. `copy from <identifier> <value> <value>`
+5. `run <value>`
+6. `env { KEY = <value> ... }`
+7. `expose <value>`
+8. `cmd <value>`
+9. `entrypoint <value>`
+
+### Service Statements
+Inside `service`:
+1. `use <template>(args...)`
+2. `env { KEY = <value> ... }`
+3. `expose <value>`
+4. `cmd <value>`
+5. `entrypoint <value>`
+6. `port <value>`
+7. `depends_on <identifier>`
+
+## 7. Generation Rules
 Pipeline:
+
+```text
+DSL -> AST -> semantic validation -> template expansion -> Docker IR -> Dockerfile + Compose
 ```
-DSL
- ↓
-AST
- ↓
-semantic validation
- ↓
-template expansion
- ↓
-Docker IR
- ↓
-Dockerfile
-```
-## 9. Validation rules
-Errors that the compiler should be able to detect:
+
+Per service:
+1. Generate `Dockerfile.<service>`
+2. Generate compose service entry in `docker-compose.generated.yml`
+
+Runtime overlay behavior:
+1. Service `env` is appended to final stage `ENV` and projected to compose `environment`.
+2. Service `expose` is appended to final stage `EXPOSE`.
+3. Service `cmd` / `entrypoint` overrides final stage defaults when present.
+4. Service `port` is projected to compose `ports`.
+5. If no explicit `port` exists, service-level `expose` values may be projected as `p:p`.
+
+## 8. Validation Rules
 ### Syntax
-```
-unexpected token @ line 10
-missing brace @ line 3
-invalid statement @ line 5
-```
-### Semantic
-```
-unknown template @ line 10
-wrong number of arguments @ line 3
-duplicate service @ line 4
-duplicate stage name @ line 3
-copy from unknown stage @ line 7
-```
-## 10. Explicit non-goals at (v0.0.1)
-Not supported during this release:
-```
-imports
-conditionals
-loops
-functions
-variables outside templates
-docker compose
-kubernetes
-policy rules
-```
-## 11. Grammar sketch
-```
-file
-  = declaration*
+Compiler must reject malformed declarations/statements (unexpected token, missing delimiter, invalid statement position).
 
-declaration
-  = template_decl
-  | service_decl
+### Semantics
+1. Template names must be unique.
+2. Service names must be unique.
+3. Template parameters must be unique.
+4. Stage names must be unique per template.
+5. Each stage must contain exactly one `from`.
+6. `copy from <stage>` must reference an existing stage.
+7. Each service must contain exactly one `use` (current v0.2 implementation rule).
+8. `use` argument count must match template parameter count.
+9. Services cannot `depends_on` themselves.
 
-template_decl
-  = "template" IDENT "(" params ")" "{" template_body "}"
-
-service_decl
-  = "service" IDENT "{" service_body "}"
-
-template_body
-  = stage_decl*
-
-service_body
-  = use_stmt
-  | env_block
-  | stage_decl
-
-stage_decl
-  = "stage" IDENT "{" stage_stmt* "}"
-
-stage_stmt
-  = from_stmt
-  | run_stmt
-  | copy_stmt
-  | workdir_stmt
-  | expose_stmt
-  | cmd_stmt
-  | entrypoint_stmt
-
-use_stmt
-  = "use" IDENT "(" args ")"
-```
-## 12. File Extension
-```
-*.abstck
-```
-## 13. cli
-```
-abstack build file.abstck
-abstack validate file.abstck
-abstack dump-ast file.abstck
-```
+## 9. Output Layout
+Current compiler default:
+1. Dockerfiles: `generated/Dockerfile.<service>` (or custom `--out-dir`)
+2. Compose: `generated/docker-compose.generated.yml` (or custom `--compose-file`)
