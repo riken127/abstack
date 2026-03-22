@@ -34,20 +34,32 @@ cmake --preset native --fresh
 
 ### Vcpkg
 
-The `vcpkg` preset is available for future dependency work. It expects `VCPKG_ROOT` to point to a local vcpkg checkout:
+This repository vendors vcpkg as a git submodule under `3rd-party/vcpkg`.
+
+Initialize submodules once after clone:
 
 ```bash
-export VCPKG_ROOT=/path/to/vcpkg
+git submodule update --init --recursive
+```
+
+Then configure/build with the `vcpkg` preset:
+
+```bash
 cmake --preset vcpkg
 cmake --build --preset vcpkg
 ```
 
-That preset writes its build tree to `build/vcpkg/`. If you switch editors or want clangd to use that database instead, update the compile database path in `.clangd` or configure the project with the native preset again.
+That preset writes its build tree to `build/vcpkg/` and uses:
+
+```text
+3rd-party/vcpkg/scripts/buildsystems/vcpkg.cmake
+```
+
+If you switch editors or want clangd to use that database instead, update the compile database path in `.clangd` or configure the project with the native preset again.
 
 For TUI-capable builds through vcpkg, enable the optional manifest feature:
 
 ```bash
-export VCPKG_ROOT=/path/to/vcpkg
 export VCPKG_MANIFEST_FEATURES=tui
 cmake --preset vcpkg
 cmake --build --preset vcpkg

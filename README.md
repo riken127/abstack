@@ -70,6 +70,7 @@ ctest --test-dir build/native --output-on-failure
 - [`src/format`](src/format): canonical `.abs` formatter
 - [`src/cli/main.cxx`](src/cli/main.cxx): CLI entrypoint
 - [`tests/pipeline_test.cxx`](tests/pipeline_test.cxx): integration tests
+- [`3rd-party/vcpkg`](3rd-party/vcpkg): vendored vcpkg toolchain submodule
 - [`samples`](samples): runnable DSL samples
 
 ## LSP

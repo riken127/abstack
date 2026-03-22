@@ -26,10 +26,10 @@
     {
       "name": "vcpkg",
       "displayName": "Native build with vcpkg",
-      "description": "Configure the project with the vcpkg toolchain if VCPKG_ROOT is set.",
+      "description": "Configure the project with the repository submodule vcpkg toolchain.",
       "inherits": "base",
       "binaryDir": "${sourceDir}/build/vcpkg",
-      "toolchainFile": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake",
+      "toolchainFile": "${sourceDir}/3rd-party/vcpkg/scripts/buildsystems/vcpkg.cmake",
       "environment": {
         "VCPKG_FEATURE_FLAGS": "manifests"
       }
