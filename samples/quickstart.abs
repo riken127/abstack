@@ -1,0 +1,12 @@
+template hello_service() {
+    stage runtime {
+        from "alpine:3.20"
+        run "echo hello from abstack"
+        cmd ["/bin/sh", "-c", "echo hello"]
+    }
+}
+
+service hello {
+    use hello_service()
+    port "8080:8080"
+}

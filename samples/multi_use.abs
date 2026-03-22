@@ -5,11 +5,9 @@ template diagnostics() {
     }
 }
 
-template go_service(name, service_port) {
+template app(name, service_port) {
     stage build {
         from "golang:1.22"
-        workdir "/src"
-        copy "." "/src"
         run "go build -o app ./cmd/${name}"
     }
 
@@ -21,27 +19,10 @@ template go_service(name, service_port) {
     }
 }
 
-template postgres() {
-    stage runtime {
-        from "postgres:16"
-        expose 5432
-    }
-}
-
-service db {
-    use postgres()
-    port "5432:5432"
-}
-
 service api {
     use diagnostics()
-    use go_service("api", 8080)
-    env {
-        SERVICE_NAME = "api"
-        LOG_LEVEL = "info"
-    }
+    use app("api", 8080)
     entrypoint ["/app"]
-    cmd ["/app", "--http"]
+    cmd ["/app", "--serve"]
     port "8080:8080"
-    depends_on db
 }

@@ -1,11 +1,4 @@
-template diagnostics() {
-    stage diag {
-        from "alpine:3.20"
-        run "echo diagnostics enabled"
-    }
-}
-
-template go_service(name, service_port) {
+template go_runtime(name, service_port) {
     stage build {
         from "golang:1.22"
         workdir "/src"
@@ -30,18 +23,32 @@ template postgres() {
 
 service db {
     use postgres()
+    env {
+        POSTGRES_DB = "abstack"
+        POSTGRES_USER = "abstack"
+        POSTGRES_PASSWORD = "abstack"
+    }
     port "5432:5432"
 }
 
 service api {
-    use diagnostics()
-    use go_service("api", 8080)
+    use go_runtime("api", 8080)
     env {
-        SERVICE_NAME = "api"
+        DB_HOST = "db"
+        DB_PORT = "5432"
         LOG_LEVEL = "info"
     }
-    entrypoint ["/app"]
-    cmd ["/app", "--http"]
     port "8080:8080"
+    depends_on db
+}
+
+service worker {
+    use go_runtime("worker", 9090)
+    env {
+        DB_HOST = "db"
+        DB_PORT = "5432"
+    }
+    cmd ["/app", "--queue", "jobs"]
+    port "9090:9090"
     depends_on db
 }

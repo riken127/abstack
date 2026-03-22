@@ -1,6 +1,6 @@
-# Abstack Grammar Reference v0.2.0
+# Abstack Grammar Reference v0.3.0
 
-Compact EBNF sketch for the current compiler behavior.
+Compact EBNF sketch for current language behavior.
 
 ```ebnf
 source            = { declaration } ;
@@ -40,11 +40,13 @@ run_stmt          = "run" value ;
 env_stmt          = "env" "{" { env_pair } "}" ;
 env_pair          = identifier "=" value ;
 expose_stmt       = "expose" value ;
-cmd_stmt          = "cmd" value ;
-entrypoint_stmt   = "entrypoint" value ;
+cmd_stmt          = "cmd" command_value ;
+entrypoint_stmt   = "entrypoint" command_value ;
 port_stmt         = "port" value ;
 depends_on_stmt   = "depends_on" identifier ;
 
+command_value     = value | array_value ;
+array_value       = "[" [ value { "," value } ] "]" ;
 value             = string | integer | identifier ;
 
 identifier        = /[A-Za-z_][A-Za-z0-9_]*/ ;
@@ -53,6 +55,7 @@ integer           = /[0-9]+/ ;
 ```
 
 Notes:
-1. Services are currently restricted semantically to exactly one `use` statement.
-2. `identifier` values in templates are interpreted as parameter references.
+1. A service may declare multiple `use` statements.
+2. `identifier` values inside templates are treated as parameter references.
 3. String interpolation `${param}` is applied during template expansion.
+4. Runtime overlays (`cmd`, `entrypoint`, `env`, `expose`) are applied to the final lowered stage.
