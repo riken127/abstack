@@ -7,10 +7,13 @@
 #include "abstack/semantic/validator.hxx"
 
 #include <algorithm>
+#include <chrono>
 #include <cstdint>
+#include <cstdio>
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
+#include <iomanip>
 #include <iostream>
 #include <iterator>
 #include <optional>
@@ -19,9 +22,14 @@
 #include <stdexcept>
 #include <string>
 #include <string_view>
+#include <thread>
 #include <unordered_map>
 #include <utility>
 #include <vector>
+
+#ifndef _WIN32
+#include <sys/wait.h>
+#endif
 
 #ifdef ABSTACK_HAS_CURSES
 #include <curses.h>
@@ -43,6 +51,22 @@ struct BuildResult
     std::filesystem::path compose_file;
 };
 
+struct CommandOutput
+{
+    int exit_code = 0;
+    std::string output;
+};
+
+struct DockerContainerRow
+{
+    std::string id;
+    std::string name;
+    std::string image;
+    std::string status;
+    std::string running_for;
+    std::string ports;
+};
+
 [[nodiscard]] std::string read_file(const std::filesystem::path& path)
 {
     std::ifstream input(path, std::ios::binary);
@@ -62,6 +86,154 @@ void write_file(const std::filesystem::path& path, const std::string& content)
         throw std::runtime_error("Failed to write file: " + path.string());
 
     output << content;
+}
+
+[[nodiscard]] int parse_positive_int(const std::string& value, const std::string& option)
+{
+    int parsed = 0;
+    try
+    {
+        parsed = std::stoi(value);
+    }
+    catch (const std::exception&)
+    {
+        throw std::runtime_error(option + " must be a positive integer");
+    }
+
+    if (parsed <= 0)
+        throw std::runtime_error(option + " must be a positive integer");
+
+    return parsed;
+}
+
+[[nodiscard]] CommandOutput run_captured_command(const std::string& command)
+{
+    const std::string wrapped = command + " 2>&1";
+
+#ifdef _WIN32
+    FILE* pipe = _popen(wrapped.c_str(), "r");
+#else
+    FILE* pipe = popen(wrapped.c_str(), "r");
+#endif
+
+    if (pipe == nullptr)
+        throw std::runtime_error("Failed to execute command: " + command);
+
+    std::string output;
+    char buffer[512]{};
+    while (fgets(buffer, static_cast<int>(sizeof(buffer)), pipe) != nullptr)
+        output += buffer;
+
+#ifdef _WIN32
+    const int status = _pclose(pipe);
+    const int exit_code = status;
+#else
+    const int status = pclose(pipe);
+    int exit_code = status;
+    if (WIFEXITED(status))
+        exit_code = WEXITSTATUS(status);
+#endif
+
+    return CommandOutput{.exit_code = exit_code, .output = std::move(output)};
+}
+
+[[nodiscard]] std::string truncate_cell(std::string value, const std::size_t max_width)
+{
+    if (value.size() <= max_width)
+        return value;
+
+    if (max_width <= 3)
+        return value.substr(0, max_width);
+
+    value.resize(max_width - 3);
+    value += "...";
+    return value;
+}
+
+[[nodiscard]] std::vector<std::string> split_tab_columns(const std::string& line)
+{
+    std::vector<std::string> columns;
+    std::size_t start = 0;
+
+    while (start <= line.size())
+    {
+        const std::size_t tab = line.find('\t', start);
+        if (tab == std::string::npos)
+        {
+            columns.push_back(line.substr(start));
+            break;
+        }
+
+        columns.push_back(line.substr(start, tab - start));
+        start = tab + 1;
+    }
+
+    return columns;
+}
+
+[[nodiscard]] std::vector<DockerContainerRow> parse_docker_ps_rows(const std::string& output)
+{
+    std::vector<DockerContainerRow> rows;
+    std::istringstream input(output);
+    std::string line;
+
+    while (std::getline(input, line))
+    {
+        if (line.empty())
+            continue;
+
+        const auto columns = split_tab_columns(line);
+        if (columns.size() < 6)
+            continue;
+
+        rows.push_back(DockerContainerRow{
+            .id = columns[0],
+            .name = columns[1],
+            .image = columns[2],
+            .status = columns[3],
+            .running_for = columns[4],
+            .ports = columns[5],
+        });
+    }
+
+    return rows;
+}
+
+void print_docker_table(const std::vector<DockerContainerRow>& rows)
+{
+    constexpr std::size_t kIdWidth = 12;
+    constexpr std::size_t kNameWidth = 24;
+    constexpr std::size_t kImageWidth = 28;
+    constexpr std::size_t kStatusWidth = 24;
+    constexpr std::size_t kAgeWidth = 14;
+    constexpr std::size_t kPortsWidth = 32;
+
+    std::cout << std::left << std::setw(static_cast<int>(kIdWidth)) << "ID"
+              << "  " << std::setw(static_cast<int>(kNameWidth)) << "NAME"
+              << "  " << std::setw(static_cast<int>(kImageWidth)) << "IMAGE"
+              << "  " << std::setw(static_cast<int>(kStatusWidth)) << "STATUS"
+              << "  " << std::setw(static_cast<int>(kAgeWidth)) << "AGE"
+              << "  " << "PORTS" << "\n";
+
+    std::cout << std::string(kIdWidth + kNameWidth + kImageWidth + kStatusWidth + kAgeWidth +
+                                 kPortsWidth + 10,
+                             '-')
+              << "\n";
+
+    for (const auto& row : rows)
+    {
+        std::cout << std::left << std::setw(static_cast<int>(kIdWidth))
+                  << truncate_cell(row.id, kIdWidth) << "  "
+                  << std::setw(static_cast<int>(kNameWidth))
+                  << truncate_cell(row.name, kNameWidth) << "  "
+                  << std::setw(static_cast<int>(kImageWidth))
+                  << truncate_cell(row.image, kImageWidth) << "  "
+                  << std::setw(static_cast<int>(kStatusWidth))
+                  << truncate_cell(row.status, kStatusWidth) << "  "
+                  << std::setw(static_cast<int>(kAgeWidth))
+                  << truncate_cell(row.running_for, kAgeWidth) << "  "
+                  << truncate_cell(row.ports, kPortsWidth) << "\n";
+    }
 }
 
 [[nodiscard]] std::string consume_option_value(const std::vector<std::string>& args,
@@ -400,12 +572,261 @@ void print_help()
         << "  compose [--abs <file.abs> | --input-dir <dir>] [sync/build options]\n"
         << "          [--compose-file <file>] -- <docker compose args...>\n"
         << "\n"
+        << "  docker <ls|inspect|logs|shell|stats> [options]\n"
+        << "         Lightweight container operations helper.\n"
+        << "\n"
         << "  tui   Launch optional curses UI (if enabled in this build).\n"
         << "\n"
         << "  help  Show this help message.\n"
         << "\n"
         << "Compatibility:\n"
         << "  abstack <file.abs> [options] is treated as build command.\n";
+}
+
+void print_docker_help()
+{
+    std::cout
+        << "abstack docker command suite\n"
+        << "\n"
+        << "Subcommands:\n"
+        << "  docker ls [--all] [--filter <regex>] [--watch <seconds>]\n"
+        << "  docker inspect <container>\n"
+        << "  docker logs <container> [--tail <lines>] [--follow]\n"
+        << "  docker shell <container> [--shell <command>] [--user <user>]\n"
+        << "  docker stats [--all]\n";
+}
+
+int handle_docker_ls(const std::vector<std::string>& args)
+{
+    bool include_all = false;
+    int watch_seconds = 0;
+    std::optional<std::string> filter_pattern;
+
+    for (std::size_t i = 0; i < args.size(); ++i)
+    {
+        const std::string& arg = args[i];
+
+        if (arg == "--all")
+        {
+            include_all = true;
+            continue;
+        }
+
+        if (arg == "--watch")
+        {
+            watch_seconds = parse_positive_int(consume_option_value(args, i, arg), arg);
+            continue;
+        }
+
+        if (arg == "--filter")
+        {
+            filter_pattern = consume_option_value(args, i, arg);
+            continue;
+        }
+
+        throw std::runtime_error("Unknown option for docker ls: " + arg);
+    }
+
+    const auto filter_regex = compile_optional_regex(filter_pattern, "--filter");
+
+    const std::string command = "docker ps " + std::string(include_all ? "-a " : "") +
+                                "--no-trunc --format '{{.ID}}\\t{{.Names}}\\t{{.Image}}\\t{{.Status}}\\t{{.RunningFor}}\\t{{.Ports}}'";
+
+    do
+    {
+        const auto result = run_captured_command(command);
+        if (result.exit_code != 0)
+            throw std::runtime_error("docker ps failed:\n" + result.output);
+
+        auto rows = parse_docker_ps_rows(result.output);
+        if (filter_regex.has_value())
+        {
+            std::vector<DockerContainerRow> filtered;
+            filtered.reserve(rows.size());
+
+            for (const auto& row : rows)
+            {
+                if (std::regex_search(row.id, *filter_regex) ||
+                    std::regex_search(row.name, *filter_regex) ||
+                    std::regex_search(row.image, *filter_regex) ||
+                    std::regex_search(row.status, *filter_regex))
+                {
+                    filtered.push_back(row);
+                }
+            }
+
+            rows = std::move(filtered);
+        }
+
+        std::sort(rows.begin(),
+                  rows.end(),
+                  [](const DockerContainerRow& a, const DockerContainerRow& b) {
+                      return a.name < b.name;
+                  });
+
+        if (watch_seconds > 0)
+            std::cout << "\x1b[2J\x1b[H";
+
+        print_docker_table(rows);
+        std::cout << "\n" << rows.size() << " container(s) listed\n";
+
+        if (watch_seconds <= 0)
+            break;
+
+        std::cout << "Refreshing every " << watch_seconds << " second(s). Ctrl+C to stop.\n";
+        std::this_thread::sleep_for(std::chrono::seconds(watch_seconds));
+    } while (true);
+
+    return 0;
+}
+
+int handle_docker_inspect(const std::vector<std::string>& args)
+{
+    if (args.size() != 1)
+        throw std::runtime_error("docker inspect requires exactly one container identifier");
+
+    const auto result =
+        run_captured_command("docker inspect " + shell_escape(args.front()));
+    if (result.exit_code != 0)
+        throw std::runtime_error("docker inspect failed:\n" + result.output);
+
+    std::cout << result.output;
+    return 0;
+}
+
+int handle_docker_logs(const std::vector<std::string>& args)
+{
+    std::optional<std::string> container;
+    int tail_lines = 200;
+    bool follow = false;
+
+    for (std::size_t i = 0; i < args.size(); ++i)
+    {
+        const std::string& arg = args[i];
+
+        if (arg == "--tail")
+        {
+            tail_lines = parse_positive_int(consume_option_value(args, i, arg), arg);
+            continue;
+        }
+
+        if (arg == "--follow")
+        {
+            follow = true;
+            continue;
+        }
+
+        if (!arg.empty() && arg.front() == '-')
+            throw std::runtime_error("Unknown option for docker logs: " + arg);
+
+        if (container.has_value())
+            throw std::runtime_error("docker logs accepts exactly one container identifier");
+
+        container = arg;
+    }
+
+    if (!container.has_value())
+        throw std::runtime_error("docker logs requires a container identifier");
+
+    std::string command = "docker logs --tail " + std::to_string(tail_lines) + " ";
+    if (follow)
+        command += "--follow ";
+
+    command += shell_escape(*container);
+    return std::system(command.c_str());
+}
+
+int handle_docker_shell(const std::vector<std::string>& args)
+{
+    std::optional<std::string> container;
+    std::string shell = "sh";
+    std::optional<std::string> user;
+
+    for (std::size_t i = 0; i < args.size(); ++i)
+    {
+        const std::string& arg = args[i];
+
+        if (arg == "--shell")
+        {
+            shell = consume_option_value(args, i, arg);
+            continue;
+        }
+
+        if (arg == "--user")
+        {
+            user = consume_option_value(args, i, arg);
+            continue;
+        }
+
+        if (!arg.empty() && arg.front() == '-')
+            throw std::runtime_error("Unknown option for docker shell: " + arg);
+
+        if (container.has_value())
+            throw std::runtime_error("docker shell accepts exactly one container identifier");
+
+        container = arg;
+    }
+
+    if (!container.has_value())
+        throw std::runtime_error("docker shell requires a container identifier");
+
+    std::string command = "docker exec -it ";
+    if (user.has_value())
+        command += "--user " + shell_escape(*user) + " ";
+
+    command += shell_escape(*container) + " " + shell_escape(shell);
+    return std::system(command.c_str());
+}
+
+int handle_docker_stats(const std::vector<std::string>& args)
+{
+    bool include_all = false;
+
+    for (const auto& arg : args)
+    {
+        if (arg == "--all")
+        {
+            include_all = true;
+            continue;
+        }
+
+        throw std::runtime_error("Unknown option for docker stats: " + arg);
+    }
+
+    std::string command = "docker stats --no-stream ";
+    if (include_all)
+        command += "--all";
+
+    return std::system(command.c_str());
+}
+
+int handle_docker(const std::vector<std::string>& args)
+{
+    if (args.empty() || args.front() == "help" || args.front() == "--help" || args.front() == "-h")
+    {
+        print_docker_help();
+        return 0;
+    }
+
+    const std::string& command = args.front();
+    const std::vector<std::string> subargs(args.begin() + 1, args.end());
+
+    if (command == "ls")
+        return handle_docker_ls(subargs);
+
+    if (command == "inspect")
+        return handle_docker_inspect(subargs);
+
+    if (command == "logs")
+        return handle_docker_logs(subargs);
+
+    if (command == "shell")
+        return handle_docker_shell(subargs);
+
+    if (command == "stats")
+        return handle_docker_stats(subargs);
+
+    throw std::runtime_error("Unknown docker subcommand: " + command);
 }
 
 int handle_build(const std::vector<std::string>& args)
@@ -912,6 +1333,9 @@ int main(int argc, char** argv)
 
         if (command == "compose")
             return handle_compose(subargs);
+
+        if (command == "docker")
+            return handle_docker(subargs);
 
         if (command == "tui")
             return handle_tui();
