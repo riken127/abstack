@@ -1,4 +1,4 @@
-# CLI Guide (v0.4.0)
+# CLI Guide (v0.5.0)
 
 This guide is the practical "how to operate `abstack`" document for local development, CI pipelines, and lightweight Docker runtime workflows.
 
@@ -38,7 +38,8 @@ When to use each command:
 3. `fmt`: canonical source formatting.
 4. `compose`: optionally generate, then run `docker compose`.
 5. `docker`: minimal container inspection/operations helper.
-6. `tui`: minimal interactive entrypoint for `build`/`fmt`/`sync`.
+6. `stdlib`: list bundled stdlib profiles.
+7. `tui`: minimal interactive entrypoint for `build`/`fmt`/`sync`.
 
 ## 3. Command Conventions
 
@@ -47,6 +48,7 @@ When to use each command:
 3. Paths may be relative or absolute.
 4. Errors are surfaced as non-zero exit with explicit messages.
 5. Backward compatibility is preserved: `abstack <file.abs> ...` maps to `abstack build <file.abs> ...`.
+6. Stdlib linkage is explicit and opt-in through `--stdlib-profile`.
 
 ## 4. Generated Output Model
 
@@ -80,6 +82,8 @@ Options:
 3. `--service-regex <pattern>`
 4. `--clean`
 5. `--dry-run`
+6. `--stdlib-profile <name>`
+7. `--list-stdlib-profiles`
 
 Typical usage:
 
@@ -97,6 +101,7 @@ Validation-only plus compose preview:
 
 ```bash
 abstack build samples/unified.abs --dry-run
+abstack build samples/stdlib_stack.abs --stdlib-profile default --out-dir generated --clean
 ```
 
 `--dry-run` writes no files and prints compose output to stdout after successful parse/validate/lower.
@@ -117,6 +122,8 @@ Options:
 4. `--out-dir <dir>`
 5. `--compose-file <file>`
 6. `--clean`
+7. `--stdlib-profile <name>`
+8. `--list-stdlib-profiles`
 
 Processing behavior:
 
@@ -136,7 +143,30 @@ abstack sync \
   --clean
 ```
 
-## 7. `fmt`: Canonical Formatting
+## 7. Stdlib Profiles (Opt-In)
+
+The bundled stdlib is linked before semantic validation/lowering only when explicitly requested.
+
+List available profiles:
+
+```bash
+abstack stdlib list
+abstack build --list-stdlib-profiles
+```
+
+Enable stdlib in generation commands:
+
+```bash
+abstack build samples/stdlib_stack.abs --stdlib-profile default --out-dir generated
+abstack sync --input-dir samples --stdlib-profile core-v1 --out-dir generated
+```
+
+Current bundled profile aliases:
+
+1. `core-v1`
+2. `default` (alias to `core-v1`)
+
+## 8. `fmt`: Canonical Formatting
 
 Syntax:
 
@@ -164,7 +194,7 @@ abstack fmt samples --file-regex '.*\\.abs$' --check
 abstack fmt samples/unified.abs --stdout
 ```
 
-## 8. `compose`: Generate + Run Compose
+## 9. `compose`: Generate + Run Compose
 
 Syntax:
 
@@ -177,22 +207,25 @@ Generation choices:
 1. `--abs <file.abs>` for single-file generation.
 2. `--input-dir <dir>` plus sync options for multi-file generation.
 3. Omit both to run against an existing compose file.
+4. `--stdlib-profile <name>` is supported when generation inputs are present.
 
 Important rules:
 
 1. `--` is required before compose arguments.
 2. `--abs` and `--input-dir` are mutually exclusive.
 3. If generation options are omitted, compose file must already exist.
+4. `--stdlib-profile` requires `--abs` or `--input-dir` in compose mode.
 
 Examples:
 
 ```bash
 abstack compose --abs samples/unified.abs -- up -d
+abstack compose --abs samples/stdlib_stack.abs --stdlib-profile default -- up -d
 abstack compose --compose-file generated/docker-compose.generated.yml -- ps
 abstack compose --input-dir samples --file-regex '.*\\.abs$' -- down
 ```
 
-## 9. `docker`: Minimal Runtime Helper
+## 10. `docker`: Minimal Runtime Helper
 
 Goal: provide lightweight container operations directly in `abstack` while staying close to native Docker behavior.
 
@@ -220,7 +253,7 @@ Scope boundaries:
 1. This is not a replacement for Docker Desktop or a full orchestration UI.
 2. It is intended for fast terminal-native inspection and debugging loops.
 
-## 10. `tui`: Optional Curses UI
+## 11. `tui`: Optional Curses UI
 
 Run:
 
@@ -240,7 +273,7 @@ Current key actions:
 3. `s`: sync one directory
 4. `q`: quit
 
-## 11. Regex Tips
+## 12. Regex Tips
 
 Common patterns:
 
@@ -255,13 +288,14 @@ Remember:
 2. Test patterns on small scopes first.
 3. `sync` file matching is evaluated against source paths relative to `--input-dir`.
 
-## 12. CI Patterns
+## 13. CI Patterns
 
 Minimal validation pipeline:
 
 ```bash
 abstack fmt samples --file-regex '.*\\.abs$' --check
 abstack build samples/unified.abs --out-dir generated --clean
+abstack build samples/stdlib_stack.abs --stdlib-profile default --out-dir generated --clean
 ```
 
 Monorepo-style generation:
@@ -276,18 +310,20 @@ Compose smoke workflow (when Docker is available in CI):
 abstack compose --abs samples/unified.abs -- config
 ```
 
-## 13. Failure Modes and Diagnostics
+## 14. Failure Modes and Diagnostics
 
 1. Invalid regex: command reports which option/pattern failed.
 2. Missing required args: command reports missing option/value.
 3. No service match: check `--service-regex` and namespacing assumptions.
 4. Missing compose file: generate via `build`/`sync` or provide `--compose-file`.
 5. Docker access errors: confirm daemon availability and user permissions.
+6. Unknown stdlib profile: run `abstack stdlib list` or `--list-stdlib-profiles`.
 
-## 14. Quick Decision Guide
+## 15. Quick Decision Guide
 
 1. "I changed one file and want artifacts now": `build`.
 2. "I have many `.abs` files and want one merged output": `sync`.
-3. "I need style consistency checks": `fmt --check`.
-4. "I want compose lifecycle from generated artifacts": `compose`.
-5. "I need fast container inspection/logs/shell": `docker`.
+3. "I want bundled reusable templates without local declarations": `--stdlib-profile`.
+4. "I need style consistency checks": `fmt --check`.
+5. "I want compose lifecycle from generated artifacts": `compose`.
+6. "I need fast container inspection/logs/shell": `docker`.

@@ -1,4 +1,4 @@
-# Abstack Grammar Reference v0.3.0
+# Abstack Grammar Reference v0.5.0
 
 Compact EBNF sketch for current language behavior.
 
@@ -63,3 +63,4 @@ Notes:
    - `# like this`
    - `// like this`
    - `/* multi-line like this */`
+6. Stdlib linkage is a CLI feature (`--stdlib-profile`) and does not add grammar keywords.

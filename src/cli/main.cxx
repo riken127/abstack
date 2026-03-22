@@ -5,6 +5,7 @@
 #include "abstack/frontend/parser.hxx"
 #include "abstack/ir/lowering.hxx"
 #include "abstack/semantic/validator.hxx"
+#include "abstack/stdlib/library.hxx"
 
 #include <algorithm>
 #include <chrono>
@@ -43,6 +44,12 @@ struct EmitOptions
     std::filesystem::path output_dir = "generated";
     std::optional<std::filesystem::path> compose_path;
     bool clean_output = false;
+};
+
+struct StdlibOptions
+{
+    std::optional<std::string> profile;
+    bool list_profiles = false;
 };
 
 struct BuildResult
@@ -336,6 +343,29 @@ void print_docker_table(const std::vector<DockerContainerRow>& rows)
     return merged;
 }
 
+[[nodiscard]] abstack::Ast link_stdlib(abstack::Ast ast,
+                                       const std::optional<std::string>& stdlib_profile)
+{
+    if (!stdlib_profile.has_value())
+        return ast;
+
+    const auto source = abstack::stdlib_profile_source(*stdlib_profile);
+    if (!source.has_value())
+    {
+        throw std::runtime_error("Unknown stdlib profile `" + *stdlib_profile +
+                                 "`. Use --list-stdlib-profiles to view available profiles.");
+    }
+
+    abstack::Ast stdlib_ast =
+        parse_ast_source(std::string(*source), "stdlib profile `" + *stdlib_profile + "`");
+
+    std::vector<abstack::Ast> asts;
+    asts.reserve(2);
+    asts.push_back(std::move(stdlib_ast));
+    asts.push_back(std::move(ast));
+    return merge_asts(std::move(asts));
+}
+
 [[nodiscard]] std::uint64_t fnv1a_hash(const std::string_view value)
 {
     std::uint64_t hash = 1469598103934665603ULL;
@@ -508,13 +538,15 @@ void clean_generated_outputs(const EmitOptions& options)
 }
 
 [[nodiscard]] abstack::BuildPlan plan_from_file(const std::filesystem::path& input,
+                                                const std::optional<std::string>& stdlib_profile,
                                                 const std::optional<std::regex>& service_regex)
 {
-    return plan_from_ast(parse_ast_file(input), service_regex);
+    return plan_from_ast(link_stdlib(parse_ast_file(input), stdlib_profile), service_regex);
 }
 
 [[nodiscard]] abstack::BuildPlan plan_from_sync_dir(const std::filesystem::path& input_dir,
                                                     const std::regex& file_regex,
+                                                    const std::optional<std::string>& stdlib_profile,
                                                     const std::optional<std::regex>& service_regex,
                                                     const bool verbose)
 {
@@ -535,7 +567,36 @@ void clean_generated_outputs(const EmitOptions& options)
         asts.push_back(namespace_templates(parse_ast_file(file), input_dir, file));
     }
 
-    return plan_from_ast(merge_asts(std::move(asts)), service_regex);
+    return plan_from_ast(link_stdlib(merge_asts(std::move(asts)), stdlib_profile), service_regex);
+}
+
+void print_stdlib_profiles()
+{
+    const auto profiles = abstack::stdlib_profiles();
+
+    std::cout << "Bundled stdlib profiles:\n";
+    for (const auto& profile : profiles)
+        std::cout << "  - " << profile.name << ": " << profile.description << "\n";
+}
+
+[[nodiscard]] bool consume_stdlib_option(const std::vector<std::string>& args,
+                                         std::size_t& index,
+                                         const std::string& arg,
+                                         StdlibOptions& stdlib)
+{
+    if (arg == "--stdlib-profile")
+    {
+        stdlib.profile = consume_option_value(args, index, arg);
+        return true;
+    }
+
+    if (arg == "--list-stdlib-profiles")
+    {
+        stdlib.list_profiles = true;
+        return true;
+    }
+
+    return false;
 }
 
 // Shell-facing helpers build command strings one argument at a time, then
@@ -566,18 +627,23 @@ void print_help()
         << "Commands:\n"
         << "  build <file.abs> [--out-dir <dir>] [--compose-file <file>]\n"
         << "        [--service-regex <pattern>] [--clean] [--dry-run]\n"
+        << "        [--stdlib-profile <name>] [--list-stdlib-profiles]\n"
         << "\n"
         << "  fmt <file-or-dir> [--file-regex <pattern>] [--check] [--stdout]\n"
         << "\n"
         << "  sync --input-dir <dir> [--file-regex <pattern>]\n"
         << "       [--service-regex <pattern>] [--out-dir <dir>]\n"
         << "       [--compose-file <file>] [--clean]\n"
+        << "       [--stdlib-profile <name>] [--list-stdlib-profiles]\n"
         << "\n"
         << "  compose [--abs <file.abs> | --input-dir <dir>] [sync/build options]\n"
-        << "          [--compose-file <file>] -- <docker compose args...>\n"
+        << "          [--compose-file <file>] [--stdlib-profile <name>]\n"
+        << "          [--list-stdlib-profiles] -- <docker compose args...>\n"
         << "\n"
         << "  docker <ls|inspect|logs|shell|stats> [options]\n"
         << "         Lightweight container operations helper.\n"
+        << "\n"
+        << "  stdlib [list]  Show bundled stdlib profiles.\n"
         << "\n"
         << "  tui   Launch optional curses UI (if enabled in this build).\n"
         << "\n"
@@ -838,6 +904,7 @@ int handle_docker(const std::vector<std::string>& args)
 int handle_build(const std::vector<std::string>& args)
 {
     EmitOptions emit{};
+    StdlibOptions stdlib{};
     std::optional<std::string> service_pattern;
     std::optional<std::filesystem::path> input;
     bool dry_run = false;
@@ -876,6 +943,9 @@ int handle_build(const std::vector<std::string>& args)
             continue;
         }
 
+        if (consume_stdlib_option(args, i, arg, stdlib))
+            continue;
+
         if (!arg.empty() && arg.front() == '-')
             throw std::runtime_error("Unknown option for build: " + arg);
 
@@ -885,11 +955,17 @@ int handle_build(const std::vector<std::string>& args)
         input = std::filesystem::path(arg);
     }
 
+    if (stdlib.list_profiles)
+    {
+        print_stdlib_profiles();
+        return 0;
+    }
+
     if (!input.has_value())
         throw std::runtime_error("build requires an input .abs file");
 
     const auto service_regex = compile_optional_regex(service_pattern, "--service-regex");
-    const auto plan = plan_from_file(*input, service_regex);
+    const auto plan = plan_from_file(*input, stdlib.profile, service_regex);
 
     if (dry_run)
     {
@@ -905,6 +981,7 @@ int handle_build(const std::vector<std::string>& args)
 int handle_sync(const std::vector<std::string>& args)
 {
     EmitOptions emit{};
+    StdlibOptions stdlib{};
     std::optional<std::string> service_pattern;
     std::string file_pattern = R"(.*\.abs$)";
     std::optional<std::filesystem::path> input_dir;
@@ -949,7 +1026,16 @@ int handle_sync(const std::vector<std::string>& args)
             continue;
         }
 
+        if (consume_stdlib_option(args, i, arg, stdlib))
+            continue;
+
         throw std::runtime_error("Unknown option for sync: " + arg);
+    }
+
+    if (stdlib.list_profiles)
+    {
+        print_stdlib_profiles();
+        return 0;
     }
 
     if (!input_dir.has_value())
@@ -958,7 +1044,7 @@ int handle_sync(const std::vector<std::string>& args)
     const auto file_regex = compile_regex(file_pattern, "--file-regex");
     const auto service_regex = compile_optional_regex(service_pattern, "--service-regex");
 
-    const auto plan = plan_from_sync_dir(*input_dir, file_regex, service_regex, true);
+    const auto plan = plan_from_sync_dir(*input_dir, file_regex, stdlib.profile, service_regex, true);
     [[maybe_unused]] const auto build_result = emit_plan(plan, emit, true);
     return 0;
 }
@@ -1082,6 +1168,7 @@ int handle_fmt(const std::vector<std::string>& args)
 int handle_compose(const std::vector<std::string>& args)
 {
     EmitOptions emit{};
+    StdlibOptions stdlib{};
     std::optional<std::filesystem::path> abs_input;
     std::optional<std::filesystem::path> sync_input_dir;
     std::optional<std::string> service_pattern;
@@ -1148,7 +1235,16 @@ int handle_compose(const std::vector<std::string>& args)
             continue;
         }
 
+        if (consume_stdlib_option(args, i, arg, stdlib))
+            continue;
+
         throw std::runtime_error("Unknown option for compose: " + arg);
+    }
+
+    if (stdlib.list_profiles)
+    {
+        print_stdlib_profiles();
+        return 0;
     }
 
     if (compose_args.empty())
@@ -1160,17 +1256,24 @@ int handle_compose(const std::vector<std::string>& args)
     if (abs_input.has_value() && sync_input_dir.has_value())
         throw std::runtime_error("compose accepts either --abs or --input-dir, not both");
 
+    if (stdlib.profile.has_value() && !abs_input.has_value() && !sync_input_dir.has_value())
+    {
+        throw std::runtime_error(
+            "--stdlib-profile requires --abs or --input-dir in compose mode");
+    }
+
     const auto service_regex = compile_optional_regex(service_pattern, "--service-regex");
 
     if (abs_input.has_value())
     {
-        const auto plan = plan_from_file(*abs_input, service_regex);
+        const auto plan = plan_from_file(*abs_input, stdlib.profile, service_regex);
         [[maybe_unused]] const auto build_result = emit_plan(plan, emit, true);
     }
     else if (sync_input_dir.has_value())
     {
         const auto file_regex = compile_regex(file_pattern, "--file-regex");
-        const auto plan = plan_from_sync_dir(*sync_input_dir, file_regex, service_regex, true);
+        const auto plan =
+            plan_from_sync_dir(*sync_input_dir, file_regex, stdlib.profile, service_regex, true);
         [[maybe_unused]] const auto build_result = emit_plan(plan, emit, true);
     }
 
@@ -1259,7 +1362,7 @@ int handle_tui()
                 const std::string input = tui_prompt("Build input file (.abs):");
                 if (!input.empty())
                 {
-                    const auto plan = plan_from_file(input, std::nullopt);
+                    const auto plan = plan_from_file(input, std::nullopt, std::nullopt);
                     const auto result = emit_plan(plan, EmitOptions{}, false);
                     status = "Built compose: " + result.compose_file.string();
                 }
@@ -1289,7 +1392,7 @@ int handle_tui()
                         "tui sync file regex");
 
                     const auto plan =
-                        plan_from_sync_dir(input_dir, file_regex, std::nullopt, false);
+                        plan_from_sync_dir(input_dir, file_regex, std::nullopt, std::nullopt, false);
                     const auto result = emit_plan(plan, EmitOptions{}, false);
                     status = "Synced compose: " + result.compose_file.string();
                 }
@@ -1351,6 +1454,18 @@ int main(int argc, char** argv)
 
         if (command == "docker")
             return handle_docker(subargs);
+
+        if (command == "stdlib")
+        {
+            if (subargs.empty() || subargs.front() == "list" || subargs.front() == "--help" ||
+                subargs.front() == "-h")
+            {
+                print_stdlib_profiles();
+                return 0;
+            }
+
+            throw std::runtime_error("Unknown stdlib subcommand: " + subargs.front());
+        }
 
         if (command == "tui")
             return handle_tui();

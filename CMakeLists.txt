@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.21)
 
-project(abstack VERSION 0.4.0 LANGUAGES CXX)
+project(abstack VERSION 0.5.0 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -18,6 +18,7 @@ target_sources(abstack_core
         src/frontend/parser.cxx
         src/semantic/validator.cxx
         src/ir/lowering.cxx
+        src/stdlib/library.cxx
         src/codegen/dockerfile_emitter.cxx
         src/codegen/compose_emitter.cxx
         src/format/formatter.cxx

@@ -1,4 +1,4 @@
-# Abstack Language Guide (v0.4.0)
+# Abstack Language Guide (v0.5.0)
 
 This guide explains how to write `.abs` files, compile them, and reason about generated Dockerfile and Compose outputs.
 
@@ -43,7 +43,28 @@ Optional compose path override:
   --compose-file generated/compose.custom.yml
 ```
 
-## 4. Core Syntax
+## 4. Optional Bundled Stdlib
+
+Stdlib profiles can be linked explicitly in generation commands:
+
+```bash
+./build/native/abstack build samples/stdlib_stack.abs --stdlib-profile default --out-dir generated
+```
+
+List bundled profiles:
+
+```bash
+./build/native/abstack stdlib list
+```
+
+v0.5.0 bundled aliases:
+
+1. `core-v1`
+2. `default` (alias to `core-v1`)
+
+Stdlib does not change the language grammar; it provides extra templates that can be used through normal `use ...` statements.
+
+## 5. Core Syntax
 
 ### Template declaration
 
@@ -76,7 +97,7 @@ service api {
 }
 ```
 
-## 5. Statements Reference
+## 6. Statements Reference
 
 ### Stage statements
 
@@ -100,7 +121,7 @@ service api {
 6. `port <value>`: compose port mapping.
 7. `depends_on <identifier>`: compose dependency.
 
-## 6. Command Value Forms
+## 7. Command Value Forms
 
 `cmd` and `entrypoint` accept:
 
@@ -122,7 +143,7 @@ Array form is emitted as:
 1. JSON array in Dockerfile (`CMD ["...", "..."]`)
 2. YAML sequence in compose (`command: - "..."`)
 
-## 7. Multi-Use Composition
+## 8. Multi-Use Composition
 
 Services can use multiple templates:
 
@@ -141,7 +162,7 @@ Rules to remember:
 
 Because of rule 3, place the runtime/base template last if you want overlays on that image.
 
-## 8. Validation Rules
+## 9. Validation Rules
 
 The compiler validates:
 
@@ -154,7 +175,7 @@ The compiler validates:
 7. `depends_on` targets must exist.
 8. No unresolved identifier values in service runtime values.
 
-## 9. Comments
+## 10. Comments
 
 The language supports three comment styles:
 
@@ -167,7 +188,7 @@ Comments can appear anywhere whitespace is valid.
 Formatting note:
 1. `abstack fmt` is AST/canonical and currently does not preserve comments.
 
-## 10. Recommended Authoring Workflow
+## 11. Recommended Authoring Workflow
 
 1. Start with one template and one service.
 2. Add parameters and interpolation.
@@ -175,7 +196,7 @@ Formatting note:
 4. Compose with multiple `use` statements.
 5. Confirm generated outputs and keep them reviewable in CI.
 
-## 11. Troubleshooting
+## 12. Troubleshooting
 
 ### Parse error near command array
 

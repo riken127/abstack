@@ -1,4 +1,4 @@
-# Abstack Language Specification v0.3.0
+# Abstack Language Specification v0.5.0
 
 ## 1. Goal
 `abstack` is a declarative DSL for defining reusable image build logic (`template`) and deployable service instantiation (`service`) from the same source.
@@ -160,3 +160,16 @@ Default CLI output:
 These can be customized with:
 1. `--out-dir <dir>`
 2. `--compose-file <file>`
+
+## 12. Standard Library Profiles (CLI-Linked)
+The language grammar remains template/service-only. Stdlib is linked by CLI as an optional pre-validation merge step.
+
+Behavior:
+1. Enabled explicitly through CLI generation commands (`--stdlib-profile <name>`).
+2. Stdlib templates are merged into the same AST validation/lowering pipeline as user templates.
+3. `use` references resolve exactly the same way whether template definitions come from source files or stdlib.
+4. No stdlib profile is applied implicitly.
+
+Bundled aliases in v0.5.0:
+1. `core-v1`
+2. `default` (alias to `core-v1`)

@@ -1,0 +1,23 @@
+# Uses templates from the bundled stdlib profile (`default` / `core-v1`).
+# Generate with:
+#   ./build/native/abstack build samples/stdlib_stack.abs --stdlib-profile default --out-dir generated
+
+service db {
+    use std_v1_postgres()
+    port "5432:5432"
+}
+
+service cache {
+    use std_v1_redis()
+    port "6379:6379"
+}
+
+service api {
+    use std_v1_go_service("api", 8080)
+    env {
+        LOG_LEVEL = "info"
+    }
+    port "8080:8080"
+    depends_on db
+    depends_on cache
+}

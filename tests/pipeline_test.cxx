@@ -5,10 +5,14 @@
 #include "abstack/frontend/parser.hxx"
 #include "abstack/ir/lowering.hxx"
 #include "abstack/semantic/validator.hxx"
+#include "abstack/stdlib/library.hxx"
 
+#include <algorithm>
 #include <cassert>
+#include <iterator>
 #include <stdexcept>
 #include <string>
+#include <utility>
 
 namespace
 {
@@ -19,6 +23,27 @@ void assert_contains(const std::string& text, const std::string& needle)
     {
         throw std::runtime_error("Expected output to contain: " + needle + "\nActual:\n" + text);
     }
+}
+
+abstack::Ast parse_source(const std::string& source)
+{
+    abstack::Lexer lexer(source);
+    const auto tokens = lexer.tokenize();
+    abstack::Parser parser(tokens);
+    return parser.parse();
+}
+
+abstack::Ast merge_asts(abstack::Ast left, abstack::Ast right)
+{
+    abstack::Ast merged{};
+
+    merged.templates = std::move(left.templates);
+    merged.services = std::move(left.services);
+
+    std::move(right.templates.begin(), right.templates.end(), std::back_inserter(merged.templates));
+    std::move(right.services.begin(), right.services.end(), std::back_inserter(merged.services));
+
+    return merged;
 }
 
 void test_pipeline_generation()
@@ -299,6 +324,45 @@ template broken() {
     assert(threw_expected_error);
 }
 
+void test_stdlib_profiles_available()
+{
+    const auto profiles = abstack::stdlib_profiles();
+    assert(!profiles.empty());
+    assert(abstack::stdlib_profile_source("core-v1").has_value());
+    assert(abstack::stdlib_profile_source("default").has_value());
+    assert(!abstack::stdlib_profile_source("unknown-profile").has_value());
+}
+
+void test_stdlib_templates_can_be_linked_with_user_source()
+{
+    const auto stdlib_source = abstack::stdlib_profile_source("default");
+    assert(stdlib_source.has_value());
+
+    const std::string user_source = R"(
+service db {
+    use std_v1_postgres()
+}
+
+service api {
+    use std_v1_go_service("api", 8080)
+    port "8080:8080"
+    depends_on db
+}
+)";
+
+    const abstack::Ast merged = merge_asts(parse_source(std::string(*stdlib_source)),
+                                           parse_source(user_source));
+
+    abstack::validate_ast(merged);
+    const abstack::BuildPlan plan = abstack::lower_to_ir(merged);
+    assert(plan.services.size() == 2);
+
+    const std::string compose = abstack::emit_compose(plan);
+    assert_contains(compose, "api:");
+    assert_contains(compose, "db:");
+    assert_contains(compose, "\"8080:8080\"");
+}
+
 } // namespace
 
 int main()
@@ -309,5 +373,7 @@ int main()
     test_formatter_outputs_canonical_abs();
     test_comments_supported();
     test_unterminated_block_comment_rejected();
+    test_stdlib_profiles_available();
+    test_stdlib_templates_can_be_linked_with_user_source();
     return 0;
 }

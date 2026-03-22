@@ -1,4 +1,4 @@
-# CLI Cookbook (v0.4.0)
+# CLI Cookbook (v0.5.0)
 
 This cookbook provides copy/paste command recipes for common `abstack` workflows.
 
@@ -25,7 +25,16 @@ abstack build samples/unified.abs --dry-run
 
 Use this in code review to inspect projected compose changes quickly.
 
-## 3. Generate Only a Service Subset
+## 3. Discover Stdlib Profiles
+
+```bash
+abstack stdlib list
+abstack build --list-stdlib-profiles
+```
+
+Use this before writing service-only `.abs` files that rely on bundled templates.
+
+## 4. Generate Only a Service Subset
 
 Compile only selected services from one source:
 
@@ -35,7 +44,7 @@ abstack build samples/unified.abs --service-regex '^(api|db)$' --clean
 
 Useful for partial local debugging or focused CI smoke stages.
 
-## 4. Merge Many `.abs` Files from a Directory Tree
+## 5. Merge Many `.abs` Files from a Directory Tree
 
 Compile recursively with path filtering:
 
@@ -52,7 +61,7 @@ Tip:
 1. `--file-regex` is matched against paths relative to `--input-dir`.
 2. Keep folders predictable so regex patterns stay simple.
 
-## 5. Multi-File + Service Filter
+## 6. Multi-File + Service Filter
 
 Generate from many files, but only include matching service names:
 
@@ -66,13 +75,21 @@ abstack sync \
 
 `sync` supports matching both base service names and namespaced IDs.
 
-## 6. Format One File
+## 7. Build with Bundled Stdlib Templates
+
+```bash
+abstack build samples/stdlib_stack.abs --stdlib-profile default --out-dir generated --clean
+```
+
+This links the `core-v1` stdlib profile before validation/lowering.
+
+## 8. Format One File
 
 ```bash
 abstack fmt samples/unified.abs
 ```
 
-## 7. Format Check in CI
+## 9. Format Check in CI
 
 ```bash
 abstack fmt samples --file-regex '.*\\.abs$' --check
@@ -80,7 +97,7 @@ abstack fmt samples --file-regex '.*\\.abs$' --check
 
 Non-zero exit means one or more files need formatting.
 
-## 8. Print Formatted Output to Stdout
+## 10. Print Formatted Output to Stdout
 
 ```bash
 abstack fmt samples/unified.abs --stdout
@@ -88,12 +105,13 @@ abstack fmt samples/unified.abs --stdout
 
 Useful for editor integration or pre-commit preview.
 
-## 9. Run Compose Lifecycle with Generation
+## 11. Run Compose Lifecycle with Generation
 
 Generate from one source and bring services up:
 
 ```bash
 abstack compose --abs samples/unified.abs -- up -d
+abstack compose --abs samples/stdlib_stack.abs --stdlib-profile default -- up -d
 ```
 
 List running services from generated compose:
@@ -108,7 +126,7 @@ Bring them down:
 abstack compose --compose-file generated/docker-compose.generated.yml -- down
 ```
 
-## 10. Compose Validation in CI
+## 12. Compose Validation in CI
 
 Check generated compose validity without starting containers:
 
@@ -116,7 +134,7 @@ Check generated compose validity without starting containers:
 abstack compose --abs samples/unified.abs -- config
 ```
 
-## 11. Minimal Container Dashboard
+## 13. Minimal Container Dashboard
 
 List active containers:
 
@@ -136,7 +154,7 @@ Show all containers and filter by regex:
 abstack docker ls --all --filter 'api|db|worker'
 ```
 
-## 12. Investigate a Running Container
+## 14. Investigate a Running Container
 
 Inspect full metadata:
 
@@ -162,7 +180,7 @@ Snapshot resource usage:
 abstack docker stats --all
 ```
 
-## 13. Optional TUI Mode
+## 15. Optional TUI Mode
 
 Launch:
 
@@ -179,7 +197,7 @@ Keys:
 
 If unavailable, rebuild with `ABSTACK_ENABLE_TUI=ON`.
 
-## 14. Regex Snippet Bank
+## 16. Regex Snippet Bank
 
 File regex:
 
@@ -193,7 +211,7 @@ Service regex:
 2. All workers: `worker`
 3. Prefix family: `^billing-`
 
-## 15. Suggested Make Targets
+## 17. Suggested Make Targets
 
 ```make
 fmt-check:
@@ -201,6 +219,9 @@ fmt-check:
 
 gen:
 	abstack sync --input-dir samples --file-regex '.*\\.abs$$' --out-dir generated --clean
+
+gen-stdlib:
+	abstack build samples/stdlib_stack.abs --stdlib-profile default --out-dir generated --clean
 
 up:
 	abstack compose --compose-file generated/docker-compose.generated.yml -- up -d

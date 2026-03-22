@@ -79,10 +79,21 @@ Includes:
 3. PostgreSQL service.
 4. Shared template reuse for build/runtime consistency.
 
-## 5. Running an Example
+## 5. Stdlib-Based Stack
+
+File: `samples/stdlib_stack.abs`
+
+Highlights:
+
+1. Uses bundled stdlib templates only (no local template declarations).
+2. API + postgres + redis stack.
+3. Works with explicit stdlib profile linkage (`--stdlib-profile default`).
+
+## 6. Running an Example
 
 ```bash
 ./build/native/abstack samples/microservices.abs --out-dir generated
+./build/native/abstack build samples/stdlib_stack.abs --stdlib-profile default --out-dir generated
 ```
 
 You can then inspect:
@@ -92,16 +103,17 @@ You can then inspect:
 3. `generated/Dockerfile.db`
 4. `generated/docker-compose.generated.yml`
 
-## 6. Inspecting Outputs Quickly
+## 7. Inspecting Outputs Quickly
 
 ```bash
 sed -n '1,200p' generated/Dockerfile.api
 sed -n '1,200p' generated/docker-compose.generated.yml
 ```
 
-## 7. Example Selection Guidance
+## 8. Example Selection Guidance
 
 1. Start with `quickstart.abs` for syntax basics.
 2. Move to `unified.abs` for template/service layering.
 3. Use `multi_use.abs` for composition behavior.
 4. Use `microservices.abs` as a realistic baseline for project layouts.
+5. Use `stdlib_stack.abs` when you want compiler-bundled templates.

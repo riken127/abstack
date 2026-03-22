@@ -2,6 +2,32 @@
 
 All notable changes to this project are documented in this file.
 
+## [0.5.0] - 2026-03-22
+
+### Added
+
+1. Bundled stdlib profile system (opt-in) linked in CLI generation flow.
+2. New CLI stdlib support:
+   - `--stdlib-profile <name>` on `build`, `sync`, and generation-enabled `compose`
+   - `--list-stdlib-profiles` on `build`, `sync`, and `compose`
+   - `abstack stdlib list`
+3. Bundled `core-v1` stdlib templates (with `default` alias):
+   - `std_v1_go_service`
+   - `std_v1_node_service`
+   - `std_v1_python_service`
+   - `std_v1_static_site`
+   - `std_v1_postgres`
+   - `std_v1_redis`
+4. Stdlib integration coverage in pipeline tests.
+5. New stdlib sample: `samples/stdlib_stack.abs`.
+6. Release notes for v0.5.0.
+
+### Changed
+
+1. Project version bumped to 0.5.0.
+2. CLI help and command reference updated for stdlib profile workflows.
+3. Language/spec/docs updated to clarify CLI-linked stdlib behavior.
+
 ## [0.4.0] - 2026-03-22
 
 ### Added
