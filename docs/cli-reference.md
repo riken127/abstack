@@ -4,9 +4,9 @@ This is a command-by-command reference for `abstack`.
 
 See also:
 
-1. [CLI guide](/home/riken/programming/abstack/docs/cli-guide.md) for workflow explanations.
-2. [CLI cookbook](/home/riken/programming/abstack/docs/cli-cookbook.md) for recipe-style examples.
-3. [Stdlib guide](/home/riken/programming/abstack/docs/stdlib.md) for bundled template reference.
+1. [CLI guide](cli-guide.md) for workflow explanations.
+2. [CLI cookbook](cli-cookbook.md) for recipe-style examples.
+3. [Stdlib guide](stdlib.md) for bundled template reference.
 
 ## 1. Top-Level
 

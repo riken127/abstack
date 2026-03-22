@@ -43,34 +43,34 @@ ctest --test-dir build/native --output-on-failure
 
 ## Documentation
 
-1. [Language spec](/home/riken/programming/abstack/docs/spec.md)
-2. [Grammar reference](/home/riken/programming/abstack/docs/grammar.md)
-3. [Language guide](/home/riken/programming/abstack/docs/language-guide.md)
-4. [Stdlib guide](/home/riken/programming/abstack/docs/stdlib.md)
-5. [CLI guide](/home/riken/programming/abstack/docs/cli-guide.md)
-6. [CLI reference](/home/riken/programming/abstack/docs/cli-reference.md)
-7. [CLI cookbook](/home/riken/programming/abstack/docs/cli-cookbook.md)
-8. [Examples guide](/home/riken/programming/abstack/docs/examples.md)
-9. [Tooling/CI guide](/home/riken/programming/abstack/docs/tooling.md)
-10. [Release notes v0.6.0](/home/riken/programming/abstack/docs/releases/v0.6.0.md)
-11. [Release notes v0.5.0](/home/riken/programming/abstack/docs/releases/v0.5.0.md)
-12. [Release notes v0.4.0](/home/riken/programming/abstack/docs/releases/v0.4.0.md)
-13. [Release notes v0.3.0](/home/riken/programming/abstack/docs/releases/v0.3.0.md)
-14. [Changelog](/home/riken/programming/abstack/CHANGELOG.md)
-15. [Contributing](/home/riken/programming/abstack/CONTRIBUTING.md)
+1. [Language spec](docs/spec.md)
+2. [Grammar reference](docs/grammar.md)
+3. [Language guide](docs/language-guide.md)
+4. [Stdlib guide](docs/stdlib.md)
+5. [CLI guide](docs/cli-guide.md)
+6. [CLI reference](docs/cli-reference.md)
+7. [CLI cookbook](docs/cli-cookbook.md)
+8. [Examples guide](docs/examples.md)
+9. [Tooling/CI guide](docs/tooling.md)
+10. [Release notes v0.6.0](docs/releases/v0.6.0.md)
+11. [Release notes v0.5.0](docs/releases/v0.5.0.md)
+12. [Release notes v0.4.0](docs/releases/v0.4.0.md)
+13. [Release notes v0.3.0](docs/releases/v0.3.0.md)
+14. [Changelog](CHANGELOG.md)
+15. [Contributing](CONTRIBUTING.md)
 
 ## Project Layout
 
-- [`include/abstack`](/home/riken/programming/abstack/include/abstack): public compiler interfaces
-- [`src/frontend`](/home/riken/programming/abstack/src/frontend): lexer/parser
-- [`src/semantic`](/home/riken/programming/abstack/src/semantic): semantic checks
-- [`src/ir`](/home/riken/programming/abstack/src/ir): lowering and template expansion
-- [`src/stdlib`](/home/riken/programming/abstack/src/stdlib): bundled stdlib profile definitions
-- [`src/codegen`](/home/riken/programming/abstack/src/codegen): Dockerfile/Compose emitters
-- [`src/format`](/home/riken/programming/abstack/src/format): canonical `.abs` formatter
-- [`src/cli/main.cxx`](/home/riken/programming/abstack/src/cli/main.cxx): CLI entrypoint
-- [`tests/pipeline_test.cxx`](/home/riken/programming/abstack/tests/pipeline_test.cxx): integration tests
-- [`samples`](/home/riken/programming/abstack/samples): runnable DSL samples
+- [`include/abstack`](include/abstack): public compiler interfaces
+- [`src/frontend`](src/frontend): lexer/parser
+- [`src/semantic`](src/semantic): semantic checks
+- [`src/ir`](src/ir): lowering and template expansion
+- [`src/stdlib`](src/stdlib): bundled stdlib profile definitions
+- [`src/codegen`](src/codegen): Dockerfile/Compose emitters
+- [`src/format`](src/format): canonical `.abs` formatter
+- [`src/cli/main.cxx`](src/cli/main.cxx): CLI entrypoint
+- [`tests/pipeline_test.cxx`](tests/pipeline_test.cxx): integration tests
+- [`samples`](samples): runnable DSL samples
 
 ## LSP
 
