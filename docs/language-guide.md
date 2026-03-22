@@ -154,7 +154,20 @@ The compiler validates:
 7. `depends_on` targets must exist.
 8. No unresolved identifier values in service runtime values.
 
-## 9. Recommended Authoring Workflow
+## 9. Comments
+
+The language supports three comment styles:
+
+1. `# single-line comment`
+2. `// single-line comment`
+3. `/* multi-line comment */`
+
+Comments can appear anywhere whitespace is valid.
+
+Formatting note:
+1. `abstack fmt` is AST/canonical and currently does not preserve comments.
+
+## 10. Recommended Authoring Workflow
 
 1. Start with one template and one service.
 2. Add parameters and interpolation.
@@ -162,7 +175,7 @@ The compiler validates:
 4. Compose with multiple `use` statements.
 5. Confirm generated outputs and keep them reviewable in CI.
 
-## 10. Troubleshooting
+## 11. Troubleshooting
 
 ### Parse error near command array
 

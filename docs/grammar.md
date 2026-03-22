@@ -59,3 +59,7 @@ Notes:
 2. `identifier` values inside templates are treated as parameter references.
 3. String interpolation `${param}` is applied during template expansion.
 4. Runtime overlays (`cmd`, `entrypoint`, `env`, `expose`) are applied to the final lowered stage.
+5. Comments are ignored by the lexer and can appear anywhere whitespace is valid:
+   - `# like this`
+   - `// like this`
+   - `/* multi-line like this */`

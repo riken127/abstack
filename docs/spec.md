@@ -74,7 +74,15 @@ String interpolation is supported inside template strings:
 run "go build -o app ./cmd/${name}"
 ```
 
-## 6. Statements
+## 6. Comments
+Comments are ignored by the lexer and can appear anywhere whitespace is valid.
+
+Supported forms:
+1. `# single-line comment`
+2. `// single-line comment`
+3. `/* multi-line block comment */`
+
+## 7. Statements
 ### Stage statements (inside `stage`)
 1. `from <value>`
 2. `workdir <value>`
@@ -99,7 +107,7 @@ run "go build -o app ./cmd/${name}"
 1. scalar value (`"/app --serve"`)
 2. array form (`["/app", "--serve"]`)
 
-## 7. Multi-Use Composition
+## 8. Multi-Use Composition
 A service may contain multiple `use` statements.
 
 Current composition behavior:
@@ -109,7 +117,7 @@ Current composition behavior:
 
 Practical implication: `use` order matters because the last lowered stage is the final runtime stage.
 
-## 8. Generation Rules
+## 9. Generation Rules
 Pipeline:
 
 ```text
@@ -127,7 +135,7 @@ Runtime overlay projection:
 4. Service `port` is projected to compose `ports`.
 5. If `port` is omitted, service-level `expose` values may project as `p:p` mappings.
 
-## 9. Validation Rules
+## 10. Validation Rules
 ### Syntax
 Compiler rejects malformed declarations/statements (unexpected token, missing delimiter, invalid location).
 
@@ -144,7 +152,7 @@ Compiler rejects malformed declarations/statements (unexpected token, missing de
 10. Services cannot `depends_on` themselves.
 11. `depends_on` entries must reference declared services.
 
-## 10. Output Layout
+## 11. Output Layout
 Default CLI output:
 1. Dockerfiles: `generated/Dockerfile.<service>`
 2. Compose: `generated/docker-compose.generated.yml`

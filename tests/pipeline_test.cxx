@@ -227,6 +227,78 @@ template db_base() {
     abstack::validate_ast(reparsed);
 }
 
+void test_comments_supported()
+{
+    const std::string source = R"(
+// Single-line comment before declarations.
+template base() {
+    stage runtime {
+        from "alpine:3.20" // Trailing single-line comment.
+        run "echo hello"
+        # Hash-style comment remains valid.
+        /* Multi-line comment
+           inside stage body. */
+    }
+}
+
+/* Multi-line comment between declarations. */
+service db {
+    use base()
+}
+
+service api {
+    use base()
+    env {
+        // Inline docs for env values.
+        LOG_LEVEL = "info"
+        /* Inline block comment before next binding. */
+        MODE = "prod"
+    }
+    depends_on db
+}
+)";
+
+    abstack::Lexer lexer(source);
+    const auto tokens = lexer.tokenize();
+    abstack::Parser parser(tokens);
+    const abstack::Ast ast = parser.parse();
+    abstack::validate_ast(ast);
+
+    const abstack::BuildPlan plan = abstack::lower_to_ir(ast);
+    assert(plan.services.size() == 2);
+
+    const std::string compose = abstack::emit_compose(plan);
+    assert_contains(compose, "api:");
+    assert_contains(compose, "db:");
+    assert_contains(compose, "\"db\"");
+}
+
+void test_unterminated_block_comment_rejected()
+{
+    const std::string source = R"(
+template broken() {
+    stage runtime {
+        from "alpine:3.20"
+        /* Unterminated comment
+    }
+}
+)";
+
+    bool threw_expected_error = false;
+    try
+    {
+        abstack::Lexer lexer(source);
+        (void)lexer.tokenize();
+    }
+    catch (const std::runtime_error& error)
+    {
+        threw_expected_error =
+            std::string(error.what()).find("unterminated block comment") != std::string::npos;
+    }
+
+    assert(threw_expected_error);
+}
+
 } // namespace
 
 int main()
@@ -235,5 +307,7 @@ int main()
     test_multi_use_and_array_commands();
     test_semantic_rejects_unknown_dependency();
     test_formatter_outputs_canonical_abs();
+    test_comments_supported();
+    test_unterminated_block_comment_rejected();
     return 0;
 }

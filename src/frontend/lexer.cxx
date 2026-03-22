@@ -101,6 +101,47 @@ void Lexer::skip_whitespace_and_comments()
             continue;
         }
 
+        if (c == '/')
+        {
+            if (peek_next() == '/')
+            {
+                advance();
+                advance();
+
+                while (!is_at_end() && peek() != '\n')
+                    advance();
+                continue;
+            }
+
+            if (peek_next() == '*')
+            {
+                const int comment_start_line = line_;
+
+                advance();
+                advance();
+
+                bool terminated = false;
+                while (!is_at_end())
+                {
+                    const char current = advance();
+                    if (current == '\n')
+                        ++line_;
+
+                    if (current == '*' && !is_at_end() && peek() == '/')
+                    {
+                        advance();
+                        terminated = true;
+                        break;
+                    }
+                }
+
+                if (!terminated)
+                    throw make_lex_error(comment_start_line, "unterminated block comment");
+
+                continue;
+            }
+        }
+
         break;
     }
 }
