@@ -2,6 +2,9 @@
 
 #include <string>
 
+namespace abstack
+{
+
 enum class TokenType
 {
     Identifier,
@@ -12,8 +15,6 @@ enum class TokenType
     RBrace,
     LParen,
     RParen,
-    LBracket,
-    RBracket,
 
     Comma,
     Equal,
@@ -30,6 +31,8 @@ enum class TokenType
     Cmd,
     Entrypoint,
     Workdir,
+    Port,
+    DependsOn,
 
     EndOfFile
 };
@@ -38,5 +41,9 @@ struct Token
 {
     TokenType type;
     std::string lexeme;
-    int line;
+    int line = 1;
 };
+
+[[nodiscard]] const char* to_string(TokenType type);
+
+} // namespace abstack
