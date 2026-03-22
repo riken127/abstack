@@ -1,5 +1,6 @@
 #include "abstack/codegen/compose_emitter.hxx"
 #include "abstack/codegen/dockerfile_emitter.hxx"
+#include "abstack/format/formatter.hxx"
 #include "abstack/frontend/lexer.hxx"
 #include "abstack/frontend/parser.hxx"
 #include "abstack/ir/lowering.hxx"
@@ -180,6 +181,52 @@ service app {
     assert(threw);
 }
 
+void test_formatter_outputs_canonical_abs()
+{
+    const std::string source = R"(
+service api {
+    depends_on db
+    use app("api")
+    cmd ["/app", "--serve"]
+}
+
+template app(name) {
+    stage runtime {
+        from "alpine:3.20"
+        cmd ["/app", "--serve"]
+        run "echo ${name}"
+    }
+}
+
+service db {
+    use db_base()
+}
+
+template db_base() {
+    stage runtime {
+        from "postgres:16"
+    }
+}
+)";
+
+    abstack::Lexer lexer(source);
+    const auto tokens = lexer.tokenize();
+    abstack::Parser parser(tokens);
+    const abstack::Ast ast = parser.parse();
+    const std::string formatted = abstack::format_ast(ast);
+
+    assert_contains(formatted, "template app(name) {");
+    assert_contains(formatted, "cmd [\"/app\", \"--serve\"]");
+    assert_contains(formatted, "service api {");
+    assert_contains(formatted, "depends_on db");
+
+    abstack::Lexer formatted_lexer(formatted);
+    const auto formatted_tokens = formatted_lexer.tokenize();
+    abstack::Parser formatted_parser(formatted_tokens);
+    const abstack::Ast reparsed = formatted_parser.parse();
+    abstack::validate_ast(reparsed);
+}
+
 } // namespace
 
 int main()
@@ -187,5 +234,6 @@ int main()
     test_pipeline_generation();
     test_multi_use_and_array_commands();
     test_semantic_rejects_unknown_dependency();
+    test_formatter_outputs_canonical_abs();
     return 0;
 }

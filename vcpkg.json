@@ -1,6 +1,14 @@
 {
   "name": "abstack",
-  "version-string": "0.3.0",
+  "version-string": "0.4.0",
   "description": "A declarative language for reusable Docker builds and service instantiation.",
-  "dependencies": []
+  "dependencies": [],
+  "features": {
+    "tui": {
+      "description": "Enable the curses-backed TUI command for the abstack CLI.",
+      "dependencies": [
+        "pdcurses"
+      ]
+    }
+  }
 }
