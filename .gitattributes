@@ -1,0 +1,16 @@
+# Abstack DSL
+*.abs linguist-language=JavaScript
+*.abs linguist-detectable=true
+
+# Generated outputs
+docker-compose.generated.yml linguist-generated=true
+Dockerfile.* linguist-generated=true
+
+# Build artifacts
+build/** linguist-generated=true
+out/** linguist-generated=true
+dist/** linguist-generated=true
+
+# Third-party code
+third_party/** linguist-vendored=true
+vendor/** linguist-vendored=true
